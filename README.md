@@ -1,1 +1,3 @@
-# almacor
+# Sistema Almacor
+
+**Almacor** es un sistema de gestión diseñado para reemplazar procesos manuales basados en cuadernos y hojas de cálculo, permitiendo administrar de forma digital y centralizada la información operativa de un negocio. El software automatiza tareas clave como el control de inventario, el registro de ventas, el seguimiento de envíos y la administración de usuarios, reduciendo errores y mejorando la eficiencia en el manejo de datos. Además, proporciona control de stock en tiempo real y alertas automáticas cuando los productos alcanzan niveles mínimos. En su fase inicial funciona como un sistema independiente, aunque está preparado para integrarse en el futuro con herramientas externas como plataformas de contabilidad o comercio electrónico.
