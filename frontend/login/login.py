@@ -5,6 +5,7 @@ frontend/login/login.py — Pantalla de inicio de sesión de Almacor
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import PrimaryButton, LabeledEntry
+from backend import auth, db
 
 
 class LoginWindow(ctk.CTk):
@@ -16,6 +17,7 @@ class LoginWindow(ctk.CTk):
         self.configure(fg_color=COLOR_BG)
         self._center_window(900, 580)
         self._build_ui()
+        self._check_backend()
 
     def _center_window(self, w, h):
         self.update_idletasks()
@@ -146,10 +148,6 @@ class LoginWindow(ctk.CTk):
 
     # ── Lógica de login (placeholder — conectar al backend) ────────────────────
     def _on_login(self):
-        """
-        TODO: Llamar a backend.auth.validate_credentials(usuario, password)
-        Por ahora abre directamente la ventana principal.
-        """
         usuario  = self.field_user.get().strip()
         password = self.field_pass.get().strip()
 
@@ -157,20 +155,41 @@ class LoginWindow(ctk.CTk):
             self._show_error("Por favor completa todos los campos.")
             return
 
-        # Credenciales de prueba (eliminar al integrar BD)
-        if usuario == "admin" and password == "admin":
-            self._open_main_window()
-        else:
+        # Validar disponibilidad de backend
+        if not db.is_available():
+            self._show_404()
+            return
+
+        user = auth.login_user(usuario, password)
+        if not user:
             self._show_error("Usuario o contraseña incorrectos.")
+            return
+
+        # Login correcto
+        self._open_main_window(user)
 
     def _show_error(self, msg):
         self.error_label.configure(text=msg)
 
-    def _open_main_window(self):
-        self.after(50, self._launch_main)
+    def _show_404(self):
+        """
+        Muestra un mensaje tipo 404 cuando el backend/BD no está disponible.
+        No cierra la aplicación, solo informa al usuario.
+        """
+        self._show_error("404 — Backend / base de datos no disponible.")
 
-    def _launch_main(self):
+    def _check_backend(self):
+        """
+        Comprobación temprana para mostrar 404 si la BD no existe.
+        """
+        if not db.is_available():
+            self._show_404()
+
+    def _open_main_window(self, user):
+        self.after(50, lambda: self._launch_main(user))
+
+    def _launch_main(self, user):
         self.destroy()
         from frontend.main_window import MainWindow
-        app = MainWindow()
+        app = MainWindow(current_user=user)
         app.mainloop()

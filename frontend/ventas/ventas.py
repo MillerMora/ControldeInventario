@@ -2,28 +2,14 @@
 frontend/ventas/ventas.py — Panel de Registro de Ventas
 """
 
+import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import (
     StyledTable, SearchBar, PrimaryButton, SecondaryButton,
     LabeledEntry, LabeledCombo, Divider, MetricCard,
 )
-
-
-DEMO_VENTAS = [
-    ("#V-089", "15/03/2026", "Blusa floral ×2",     "$80",   "—",  "Valentina R.", "Completada"),
-    ("#V-088", "15/03/2026", "Jean skinny ×1",       "$65",   "$5", "Carlos M.",    "Completada"),
-    ("#V-087", "14/03/2026", "Chaqueta beige ×1",    "$120",  "—",  "Valentina R.", "Enviando"),
-    ("#V-086", "14/03/2026", "Camiseta básica ×3",   "$45",   "$5", "Carlos M.",    "Completada"),
-    ("#V-085", "13/03/2026", "Falda plisada ×1",     "$55",   "—",  "Valentina R.", "Completada"),
-    ("#V-084", "13/03/2026", "Vestido casual ×1",    "$85",   "$10","Carlos M.",    "Completada"),
-    ("#V-083", "12/03/2026", "Jean slim ×2",         "$130",  "—",  "Valentina R.", "Completada"),
-    ("#V-082", "12/03/2026", "Blusa flores ×1",      "$38",   "—",  "Carlos M.",    "Cancelado"),
-]
-
-PRODUCTOS_DEMO = ["Blusa floral", "Jean skinny", "Chaqueta beige",
-                  "Camiseta básica", "Falda plisada", "Vestido casual"]
-VENDEDORES     = ["Valentina R.", "Carlos M.", "Admin"]
+from backend import ventas as backend_ventas, productos as backend_productos, usuarios as backend_usuarios, db
 
 
 class VentasPanel(ctk.CTkFrame):
@@ -34,7 +20,10 @@ class VentasPanel(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=0)
         self.grid_rowconfigure(2, weight=1)
         self._form_visible = False
+        self._productos_idx = {}
+        self._vendedores_idx = {}
         self._build()
+        self._load_from_backend()
 
     def _build(self):
         # ── Métricas del día ─────────────────────────────────────────────────
@@ -89,7 +78,7 @@ class VentasPanel(ctk.CTkFrame):
                 ("vendedor", "Vendedor", 120),
                 ("estado",   "Estado",   105),
             ],
-            rows=DEMO_VENTAS,
+            rows=[],
         )
         self.table.grid(row=2, column=0, sticky="nsew",
                         padx=(24, 8), pady=(0, 20))
@@ -117,7 +106,7 @@ class VentasPanel(ctk.CTkFrame):
                      ).pack(anchor="w", pady=(0, 14))
         Divider(inner).pack(fill="x", pady=(0, 14))
 
-        self.f_producto  = LabeledCombo(inner, "Producto",  values=PRODUCTOS_DEMO)
+        self.f_producto  = LabeledCombo(inner, "Producto",  values=[])
         self.f_producto.pack(fill="x", pady=(0, 10))
 
         row1 = ctk.CTkFrame(inner, fg_color="transparent")
@@ -138,7 +127,7 @@ class VentasPanel(ctk.CTkFrame):
         self.f_descuento = LabeledEntry(row2, "Descuento", placeholder="$0")
         self.f_descuento.grid(row=0, column=1, sticky="ew")
 
-        self.f_vendedor = LabeledCombo(inner, "Vendedor", values=VENDEDORES)
+        self.f_vendedor = LabeledCombo(inner, "Vendedor", values=[])
         self.f_vendedor.pack(fill="x", pady=(0, 10))
 
         self.f_cliente  = LabeledEntry(inner, "Cliente (opcional)",
@@ -188,15 +177,98 @@ class VentasPanel(ctk.CTkFrame):
         pass  # Ver detalle de venta (futuro)
 
     def _on_save(self):
-        """
-        TODO: Conectar con backend.ventas.registrar_venta()
-        Datos:
-            producto  = self.f_producto.get()
-            talla     = self.f_talla.get()
-            cantidad  = self.f_cantidad.get()
-            precio_u  = self.f_precio_u.get()
-            descuento = self.f_descuento.get()
-            vendedor  = self.f_vendedor.get()
-            cliente   = self.f_cliente.get()
-        """
-        pass
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+
+        nombre_producto = self.f_producto.get()
+        vendedor_nombre = self.f_vendedor.get()
+        if not nombre_producto or not vendedor_nombre:
+            messagebox.showerror("Error", "Selecciona producto y vendedor.")
+            return
+
+        try:
+            cantidad = int(self.f_cantidad.get() or "0")
+            precio_txt = (self.f_precio_u.get() or "0").replace("$", "").replace(",", "")
+            precio_unit = float(precio_txt or 0)
+            desc_txt = (self.f_descuento.get() or "0").replace("$", "").replace(",", "")
+            descuento = float(desc_txt or 0)
+        except ValueError:
+            messagebox.showerror("Error", "Revisa que cantidad, precio y descuento sean numéricos.")
+            return
+
+        if cantidad <= 0:
+            messagebox.showerror("Error", "La cantidad debe ser mayor a 0.")
+            return
+
+        producto_id = self._productos_idx.get(nombre_producto)
+        vendedor_id = self._vendedores_idx.get(vendedor_nombre)
+        if not producto_id or not vendedor_id:
+            messagebox.showerror("Error", "No se pudo resolver producto o vendedor en la base de datos.")
+            return
+
+        data = {
+            "producto_id": producto_id,
+            "talla": self.f_talla.get().strip(),
+            "cantidad": cantidad,
+            "precio_unit": precio_unit,
+            "descuento": descuento,
+            "cliente": self.f_cliente.get().strip() or None,
+            "vendedor_id": vendedor_id,
+            "notas": self.f_notas.get("0.0", "end").strip() or None,
+            "codigo": None,
+        }
+
+        try:
+            backend_ventas.registrar_venta(data)
+            self._load_from_backend()
+            self._toggle_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo registrar la venta.\n{exc}")
+
+    # ── Backend helpers ─────────────────────────────────────────────────────────
+    def _load_from_backend(self):
+        if not db.is_available():
+            self.table.load_rows([])
+            return
+
+        # Cargar ventas
+        try:
+            rows = backend_ventas.listar_ventas()
+        except Exception:
+            self.table.load_rows([])
+        else:
+            tabla_rows = []
+            for v in rows:
+                tabla_rows.append(
+                    (
+                        v["codigo"],
+                        v["fecha"].strftime("%d/%m/%Y") if hasattr(v["fecha"], "strftime") else str(v["fecha"]),
+                        v.get("detalle", ""),
+                        f"${v['total']:.2f}",
+                        f"${v['descuento']:.2f}" if v.get("descuento") else "—",
+                        v.get("vendedor", ""),
+                        v.get("estado", "").capitalize(),
+                    )
+                )
+            self.table.load_rows(tabla_rows)
+
+        # Cargar combos de productos y vendedores
+        try:
+            productos = backend_productos.listar_productos()
+            usuarios = backend_usuarios.listar_usuarios()
+        except Exception:
+            return
+
+        self._productos_idx = {p["nombre"]: p["id"] for p in productos}
+        self._vendedores_idx = {
+            u["nombre"]: u["id"] for u in usuarios if u["rol"].upper() != "ADMIN"
+        }
+
+        if self._productos_idx:
+            self.f_producto.set(next(iter(self._productos_idx.keys())))
+            self.f_producto.combo.configure(values=list(self._productos_idx.keys()))
+        if self._vendedores_idx:
+            self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
+            self.f_vendedor.combo.configure(values=list(self._vendedores_idx.keys()))
+

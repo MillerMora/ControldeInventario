@@ -2,23 +2,17 @@
 frontend/gestionar_usuario/usuarios.py — Panel de Administración de Usuarios
 """
 
+import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import (
     StyledTable, PrimaryButton, SecondaryButton, DangerButton,
     LabeledEntry, LabeledCombo, Divider, Badge,
 )
+from backend import usuarios as backend_usuarios, db
 
 
-DEMO_USUARIOS = [
-("U-001", "Ana García",    "agarcia",    "Administrador",    "Activo",   "15/03/2026"),
-("U-002", "Valentina R.",  "vrodriguez", "Almacén", "Activo",   "12/03/2026"),
-("U-003", "Carlos M.",     "cmorales",   "Almacén", "Activo",   "10/03/2026"),
-("U-004", "Pedro S.",      "psanchez",   "Almacén",  "Activo",   "08/03/2026"),
-("U-005", "Lucía F.",      "lfuentes",   "Almacén", "Inactivo", "01/02/2026"),
-]
-
-ROLES = ["Administrador", "Almacén"]
+ROLES = ["ADMIN", "EMPLEADO"]
 
 
 class UsuariosPanel(ctk.CTkFrame):
@@ -31,6 +25,7 @@ class UsuariosPanel(ctk.CTkFrame):
         self._form_visible = False
         self._editing_id   = None
         self._build()
+        self._load_from_backend()
 
     def _build(self):
         # ── Barra superior ─────────────────────────────────────────────────────
@@ -80,7 +75,7 @@ class UsuariosPanel(ctk.CTkFrame):
                 ("estado",  "Estado",      95),
                 ("ultimo",  "Último acceso", 115),
             ],
-            rows=DEMO_USUARIOS,
+            rows=[],
         )
         self.table.grid(row=1, column=0, sticky="nsew",
                         padx=(24, 8), pady=(0, 20))
@@ -130,7 +125,7 @@ class UsuariosPanel(ctk.CTkFrame):
         self.f_rol.pack(fill="x", pady=(0, 10))
 
         self.f_estado  = LabeledCombo(inner, "Estado",
-                                      values=["Activo", "Inactivo"])
+                                      values=["ACTIVO", "INACTIVO"])
         self.f_estado.pack(fill="x", pady=(0, 16))
 
         # Permisos rápidos
@@ -219,22 +214,96 @@ class UsuariosPanel(ctk.CTkFrame):
         for field in [self.f_nombre, self.f_usuario, self.f_password, self.f_confirm]:
             field.clear()
         self.f_rol.set(ROLES[0])
-        self.f_estado.set("Activo")
+        self.f_estado.set("ACTIVO")
 
     def _on_save(self):
-        """
-        TODO: backend.usuarios.crear_usuario() / actualizar_usuario()
-        nombre   = self.f_nombre.get()
-        usuario  = self.f_usuario.get()
-        password = self.f_password.get()
-        rol      = self.f_rol.get()
-        estado   = self.f_estado.get()
-        permisos = {k: v.get() for k, v in self.perm_vars.items()}
-        """
-        pass
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+
+        nombre = self.f_nombre.get().strip()
+        usuario = self.f_usuario.get().strip()
+        password = self.f_password.get().strip()
+        confirm = self.f_confirm.get().strip()
+        rol_nombre = self.f_rol.get().strip().upper()
+        estado = self.f_estado.get().strip().upper()
+
+        if not nombre or not usuario:
+            messagebox.showerror("Error", "Nombre y usuario son obligatorios.")
+            return
+
+        if self._editing_id is None and not password:
+            messagebox.showerror("Error", "La contraseña es obligatoria para nuevos usuarios.")
+            return
+
+        if password and password != confirm:
+            messagebox.showerror("Error", "Las contraseñas no coinciden.")
+            return
+
+        try:
+            rol_id = backend_usuarios.obtener_rol_id_por_nombre(rol_nombre)
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo obtener el rol.\n{exc}")
+            return
+
+        if not rol_id:
+            messagebox.showerror("Error", "Rol no encontrado en la base de datos.")
+            return
+
+        data = {
+            "nombre": nombre,
+            "usuario": usuario,
+            "password": password or None,
+            "rol_id": rol_id,
+            "estado": estado,
+        }
+
+        try:
+            if self._editing_id is None:
+                backend_usuarios.crear_usuario(data)
+            else:
+                backend_usuarios.actualizar_usuario(self._editing_id, data)
+            self._load_from_backend()
+            self._close_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo guardar el usuario.\n{exc}")
 
     def _on_delete(self):
-        """
-        TODO: backend.usuarios.eliminar_usuario(self._editing_id)
-        """
-        pass
+        if self._editing_id is None:
+            return
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+        try:
+            backend_usuarios.eliminar_usuario(self._editing_id)
+            self._editing_id = None
+            self._load_from_backend()
+            self._close_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo eliminar el usuario.\n{exc}")
+
+    # ── Backend helpers ─────────────────────────────────────────────────────────
+    def _load_from_backend(self):
+        if not db.is_available():
+            self.table.load_rows([])
+            return
+
+        try:
+            usuarios = backend_usuarios.listar_usuarios()
+        except Exception:
+            self.table.load_rows([])
+            return
+
+        rows = []
+        for u in usuarios:
+            rows.append(
+                (
+                    f"U-{u['id']:03d}",
+                    u["nombre"],
+                    u["usuario"],
+                    u["rol"].capitalize(),
+                    "Activo" if u["estado"].upper() == "ACTIVO" else "Inactivo",
+                    "",
+                )
+            )
+        self.table.load_rows(rows)

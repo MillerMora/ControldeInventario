@@ -6,6 +6,7 @@ Todo en una sola ventana: sidebar + panel dinámico
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import AlertBanner, Divider
+from backend import productos as backend_productos, db
 
 
 NAV_ITEMS = [
@@ -18,7 +19,7 @@ NAV_ITEMS = [
 
 
 class MainWindow(ctk.CTk):
-    def __init__(self):
+    def __init__(self, current_user):
         super().__init__()
         self.title(WINDOW_TITLE)
         self.geometry(f"{WINDOW_W}x{WINDOW_H}")
@@ -26,12 +27,15 @@ class MainWindow(ctk.CTk):
         self.configure(fg_color=COLOR_BG)
         self._center_window()
 
+        self.current_user = current_user
+
         self._active_panel = None
         self._nav_buttons  = {}
         self._panels       = {}
 
         self._build_layout()
         self._load_panels()
+        self._update_stock_badge()
         self._navigate("dashboard")
 
     def _center_window(self):
@@ -85,7 +89,14 @@ class MainWindow(ctk.CTk):
         )
         nav_label.grid(row=2, column=0, sticky="w", padx=20, pady=(16, 6))
 
-        for i, (key, icon, label) in enumerate(NAV_ITEMS):
+        visible_items = []
+        for key, icon, label in NAV_ITEMS:
+            # Solo administradores pueden ver el módulo de usuarios
+            if key == "usuarios" and not self.current_user.get("es_admin"):
+                continue
+            visible_items.append((key, icon, label))
+
+        for i, (key, icon, label) in enumerate(visible_items):
             btn = ctk.CTkButton(
                 sidebar,
                 text=f"  {icon}  {label}",
@@ -123,10 +134,19 @@ class MainWindow(ctk.CTk):
 
         info = ctk.CTkFrame(user_frame, fg_color="transparent")
         info.pack(side="left", padx=(10, 0))
-        ctk.CTkLabel(info, text="Admin", font=FONT_SMALL,
-                     text_color=COLOR_TEXT_SIDEBAR).pack(anchor="w")
-        ctk.CTkLabel(info, text="Dueño", font=FONT_MICRO,
-                     text_color=COLOR_TEXT_SIDEBAR_M).pack(anchor="w")
+        ctk.CTkLabel(
+            info,
+            text=self.current_user.get("nombre", "Usuario"),
+            font=FONT_SMALL,
+            text_color=COLOR_TEXT_SIDEBAR,
+        ).pack(anchor="w")
+        rol_label = "Administrador" if self.current_user.get("es_admin") else "Empleado"
+        ctk.CTkLabel(
+            info,
+            text=rol_label,
+            font=FONT_MICRO,
+            text_color=COLOR_TEXT_SIDEBAR_M,
+        ).pack(anchor="w")
 
         # Logout
         ctk.CTkButton(
@@ -165,7 +185,7 @@ class MainWindow(ctk.CTk):
         # Alertas en topbar
         self.alert_badge = ctk.CTkButton(
             topbar,
-            text="⚠  2 productos con stock bajo",
+            text="",
             font=FONT_SMALL,
             width=220,
             height=30,
@@ -197,8 +217,10 @@ class MainWindow(ctk.CTk):
             "inventario": ProductosPanel,
             "ventas":     VentasPanel,
             "envios":     EnviosPanel,
-            "usuarios":   UsuariosPanel,
         }
+
+        if self.current_user.get("es_admin"):
+            panel_classes["usuarios"] = UsuariosPanel
         for key, cls in panel_classes.items():
             panel = cls(self.panel_container, main_window=self)
             panel.grid(row=0, column=0, sticky="nsew")
@@ -245,3 +267,37 @@ class MainWindow(ctk.CTk):
         self.destroy()
         from frontend.login.login import LoginWindow
         LoginWindow().mainloop()
+
+    # ── Alertas de stock en topbar ─────────────────────────────────────────────
+    def _update_stock_badge(self):
+        if not db.is_available():
+            self.alert_badge.configure(
+                text="404 — Backend no disponible",
+                fg_color=COLOR_DANGER_BG,
+                text_color=COLOR_DANGER,
+            )
+            return
+
+        try:
+            items = backend_productos.productos_con_bajo_stock()
+        except Exception:
+            self.alert_badge.configure(
+                text="404 — Error consultando stock",
+                fg_color=COLOR_DANGER_BG,
+                text_color=COLOR_DANGER,
+            )
+            return
+
+        count = len(items)
+        if count == 0:
+            self.alert_badge.configure(
+                text="✓ Stock en niveles normales",
+                fg_color=COLOR_SUCCESS_BG,
+                text_color=COLOR_SUCCESS,
+            )
+        else:
+            self.alert_badge.configure(
+                text=f"⚠  {count} producto(s) con stock bajo",
+                fg_color=COLOR_WARNING_BG,
+                text_color=COLOR_WARNING,
+            )

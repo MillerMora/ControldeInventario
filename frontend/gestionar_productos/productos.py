@@ -2,24 +2,14 @@
 frontend/gestionar_productos/productos.py — Panel de Gestión de Inventario
 """
 
+import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import (
     StyledTable, SearchBar, PrimaryButton, SecondaryButton,
     DangerButton, LabeledEntry, LabeledCombo, Divider,
 )
-
-
-DEMO_PRODUCTOS = [
-    ("P-001", "Blusa floral",    "M",  "Rosa",  "15", "Estante A-3", "Disponible",  "$40"),
-    ("P-002", "Jean skinny",     "28", "Azul",  "8",  "Estante B-1", "Disponible",  "$65"),
-    ("P-003", "Jean slim",       "30", "Negro", "2",  "Estante B-2", "Stock bajo",  "$65"),
-    ("P-004", "Chaqueta beige",  "L",  "Beige", "6",  "Estante C-1", "Disponible",  "$120"),
-    ("P-005", "Blusa flores",    "S",  "Blanco","1",  "Estante A-1", "Crítico",     "$38"),
-    ("P-006", "Camiseta básica", "XS", "Gris",  "22", "Estante A-5", "Disponible",  "$15"),
-    ("P-007", "Falda plisada",   "M",  "Negro", "9",  "Estante D-2", "Disponible",  "$55"),
-    ("P-008", "Vestido casual",  "L",  "Verde", "4",  "Estante D-4", "Disponible",  "$85"),
-]
+from backend import productos as backend_productos, db
 
 TALLAS  = ["XS", "S", "M", "L", "XL", "XXL",
            "24", "26", "28", "30", "32", "34", "36"]
@@ -34,7 +24,10 @@ class ProductosPanel(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=0)
         self.grid_rowconfigure(1, weight=1)
         self._form_visible = False
+        self._productos_cache = []
+        self._selected_id = None
         self._build()
+        self._load_from_backend()
 
     def _build(self):
         # ── Barra superior ────────────────────────────────────────────────────
@@ -76,7 +69,7 @@ class ProductosPanel(ctk.CTkFrame):
                 ("estado",    "Estado",  105),
                 ("precio",    "Precio",   70),
             ],
-            rows=DEMO_PRODUCTOS,
+            rows=[],
         )
         self.table.grid(row=1, column=0, sticky="nsew",
                         padx=(24, 8), pady=(0, 20))
@@ -181,9 +174,16 @@ class ProductosPanel(ctk.CTkFrame):
     def _on_select(self, _event=None):
         data = self.table.get_selected()
         if not data:
+            self._selected_id = None
             return
         # Rellenar formulario con datos de la fila seleccionada
         ref, nombre, talla, color, stock, ubicacion, estado, precio = data
+        # Buscar el ID real en caché
+        for p in self._productos_cache:
+            if p["referencia"] == ref:
+                self._selected_id = p["id"]
+                break
+
         if not self._form_visible:
             self._toggle_form()
         self.form_title_lbl.configure(text=f"Editar — {ref}")
@@ -194,6 +194,12 @@ class ProductosPanel(ctk.CTkFrame):
         self.f_ubicacion.set(ubicacion)
         self.f_estado.set(estado)
         self.f_precio.set(precio)
+        # Stock mínimo desde caché
+        if self._selected_id is not None:
+            for p in self._productos_cache:
+                if p["id"] == self._selected_id:
+                    self.f_min_stock.set(str(p.get("stock_minimo", "")))
+                    break
         self.delete_btn.pack(fill="x", pady=(10, 0))
 
     def _clear_form(self):
@@ -204,23 +210,87 @@ class ProductosPanel(ctk.CTkFrame):
         self.f_estado.set(ESTADOS[0])
 
     def _on_save(self):
-        """
-        TODO: Llamar a backend para INSERT / UPDATE en MySQL.
-        Datos capturados:
-            nombre   = self.f_nombre.get()
-            talla    = self.f_talla.get()
-            color    = self.f_color.get()
-            stock    = self.f_stock.get()
-            precio   = self.f_precio.get()
-            ubicacion= self.f_ubicacion.get()
-            estado   = self.f_estado.get()
-            min_stock= self.f_min_stock.get()
-        """
-        pass
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+
+        try:
+            nombre = self.f_nombre.get().strip()
+            talla = self.f_talla.get().strip()
+            color = self.f_color.get().strip()
+            stock = int(self.f_stock.get() or "0")
+            precio_txt = (self.f_precio.get() or "0").replace("$", "").replace(",", "")
+            precio = float(precio_txt or 0)
+            ubicacion = self.f_ubicacion.get().strip()
+            min_stock = int(self.f_min_stock.get() or "0")
+        except ValueError:
+            messagebox.showerror("Error", "Por favor revisa que stock, stock mínimo y precio sean numéricos.")
+            return
+
+        if not nombre:
+            messagebox.showerror("Error", "El nombre del producto es obligatorio.")
+            return
+
+        data = {
+            "referencia": f"P-{nombre[:3].upper()}",
+            "nombre": nombre,
+            "talla": talla,
+            "color": color,
+            "stock": stock,
+            "ubicacion": ubicacion,
+            "precio": precio,
+            "stock_minimo": min_stock,
+        }
+
+        try:
+            if self._selected_id is None:
+                backend_productos.crear_producto(data)
+            else:
+                backend_productos.actualizar_producto(self._selected_id, data)
+            self._load_from_backend()
+            self._toggle_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo guardar el producto.\n{exc}")
 
     def _on_delete(self):
-        """
-        TODO: Llamar a backend para DELETE en MySQL.
-        Ref del producto seleccionado en la tabla.
-        """
-        pass
+        if self._selected_id is None:
+            return
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+        try:
+            backend_productos.eliminar_producto(self._selected_id)
+            self._selected_id = None
+            self._load_from_backend()
+            self._toggle_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo eliminar el producto.\n{exc}")
+
+    # ── Backend helpers ─────────────────────────────────────────────────────────
+    def _load_from_backend(self):
+        if not db.is_available():
+            # Dejar tabla vacía pero no cerrar la app
+            self.table.load_rows([])
+            return
+        try:
+            productos = backend_productos.listar_productos()
+        except Exception:
+            self.table.load_rows([])
+            return
+
+        self._productos_cache = productos
+        rows = []
+        for p in productos:
+            rows.append(
+                (
+                    p["referencia"],
+                    p["nombre"],
+                    p["talla"],
+                    p["color"],
+                    str(p["stock_actual"]),
+                    p.get("ubicacion", ""),
+                    p.get("estado", ""),
+                    f"${p['precio']:.2f}",
+                )
+            )
+        self.table.load_rows(rows)

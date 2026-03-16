@@ -4,22 +4,52 @@
 
 ## 🚀 Instalación y Ejecución Rápida
 1. Asegúrate de tener **Python 3.8+** instalado.
-2. Abre una terminal en el directorio del proyecto.
-3. Ejecuta: `python main.py`.
+2. (Opcional pero recomendado) Crea y activa un entorno virtual:
+   - **Windows (PowerShell)**:
+     - `python -m venv .venv`
+     - `.\.venv\Scripts\activate`
+3. Instala las dependencias:
+   - `pip install -r requirements.txt`
+4. Crea la base de datos MySQL ejecutando el script:
+   - Importa `backend/schema.sql` en tu servidor MySQL (por ejemplo con `mysql -u root -p < backend/schema.sql`).
+5. Configura las variables de entorno de conexión (si no usas los valores por defecto del script):
+   - `ALMACOR_DB_HOST` (por defecto `localhost`)
+   - `ALMACOR_DB_PORT` (por defecto `3306`)
+   - `ALMACOR_DB_USER` (por defecto `almacor_user`)
+   - `ALMACOR_DB_PASSWORD` (por defecto `almacor_pass`)
+   - `ALMACOR_DB_NAME` (por defecto `almacor_db`)
+6. Abre una terminal en el directorio del proyecto.
+7. Ejecuta: `python main.py`.
+
+Si la base de datos o el backend no están disponibles, la aplicación **no se cerrará**; en su lugar, mostrará un mensaje tipo **“404 — Backend / base de datos no disponible”** en la pantalla de login y en la parte superior de la ventana principal.
 
 ## 🛠️ Tecnologías Requeridas
 - **Python 3.8+** (lenguaje principal).
 - **Tkinter** (incluido en la instalación estándar de Python para interfaces gráficas).
-- **CustomTkinter**: Instala customTkinter (`pip install customtkinter`) para temas y estilos modernos en la GUI.
+- **CustomTkinter**: interfaz gráfica moderna.
+- **MySQL** como base de datos relacional.
+- Paquetes Python adicionales (ver `requirements.txt`):
+  - `customtkinter`
+  - `mysql-connector-python`
+  - `bcrypt`
 
-No se requieren dependencias adicionales complejas; el proyecto usa principalmente librerías estándar de Python.
 
 ## 📁 Estructura del Proyecto
 ```
 ControldeInventario/
-├── .gitignore                  # Configuración para ignorar archivos en Git (e.g., cachés, entornos virtuales)
+├── .gitignore                  # Configuración para ignorar archivos en Git.
 ├── main.py                     # Punto de entrada principal de la aplicación. Inicia la ventana principal.
 ├── README.md                   # Documentación del proyecto (este archivo).
+├── requirements.txt            # Dependencias de Python.
+├── backend/                    # Lógica de negocio y acceso a datos (MySQL).
+│   ├── __init__.py
+│   ├── db.py                   # Conexión y pool hacia MySQL.
+│   ├── auth.py                 # Autenticación de usuarios y verificación de credenciales.
+│   ├── productos.py            # Operaciones sobre productos / inventario.
+│   ├── ventas.py               # Operaciones sobre ventas (cabecera y detalle, actualización de stock).
+│   ├── envios.py               # Operaciones sobre envíos.
+│   ├── usuarios.py             # Operaciones sobre usuarios y roles.
+│   └── schema.sql              # Script SQL para crear la base de datos y tablas.
 └── frontend/                   # Directorio principal de la interfaz gráfica (GUI).
     ├── components.py           # Componentes reutilizables de la UI (botones, formularios, widgets personalizados).
     ├── main_window.py          # Define la ventana principal de la aplicación.
@@ -39,6 +69,15 @@ ControldeInventario/
 ```
 
 Cada módulo en `frontend/` es independiente pero integrado en la ventana principal, facilitando el mantenimiento y escalabilidad del sistema.
+
+El frontend se comunica con el backend a través de los módulos de Python del paquete `backend`:
+- El **login** valida las credenciales con `backend.auth.login_user`.
+- Los módulos de **inventario**, **ventas**, **envíos** y **usuarios** leen y escriben datos en MySQL mediante `backend.productos`, `backend.ventas`, `backend.envios` y `backend.usuarios`.
+- El **dashboard** muestra métricas y tablas a partir de consultas en estas mismas capas.
+
+Los roles soportados por defecto son:
+- **ADMIN**: acceso completo (gestión de usuarios y productos, ventas, envíos, dashboard).
+- **EMPLEADO**: puede consultar inventario y registrar ventas y envíos, pero no administrar usuarios.
 
 ## imagenes del frontend
 ![Login](imagenes/image.png)

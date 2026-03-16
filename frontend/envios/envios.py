@@ -2,27 +2,17 @@
 frontend/envios/envios.py — Panel de Seguimiento de Envíos
 """
 
+import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
 from frontend.components import (
     StyledTable, SearchBar, PrimaryButton, SecondaryButton,
     LabeledEntry, LabeledCombo, Divider, MetricCard,
 )
+from backend import envios as backend_envios, usuarios as backend_usuarios, db
 
-
-DEMO_ENVIOS = [
-    ("GU-2024", "14/03/2026", "Chaqueta beige L", "Medellín", "Valentina R.", "En tránsito"),
-    ("GU-2023", "13/03/2026", "Jean skinny 28", "Cali", "Carlos M.", "Entregado"),
-    ("GU-2022", "12/03/2026", "Blusa floral M", "Bogotá", "Valentina R.", "Pendiente"),
-    ("GU-2021", "11/03/2026", "Camiseta S ×2", "Pereira", "Carlos M.", "En tránsito"),
-    ("GU-2020", "10/03/2026", "Falda plisada M", "Medellín", "Valentina R.", "Entregado"),
-    ("GU-2019", "09/03/2026", "Vestido casual L", "Cali", "Carlos M.", "Cancelado"),
-    ("GU-2018", "08/03/2026", "Jean slim 30", "Bogotá", "Valentina R.", "Entregado"),
-    ("GU-2017", "07/03/2026", "Blusa flores S", "Pereira", "Carlos M.", "Pendiente"),
-]
 
 CIUDADES = ["Medellín", "Bogotá", "Cali", "Pereira", "Bucaramanga", "Barranquilla"]
-VENDEDORES = ["Valentina R.", "Carlos M.", "Admin"]
 
 
 class EnviosPanel(ctk.CTkFrame):
@@ -33,7 +23,9 @@ class EnviosPanel(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=0)
         self.grid_rowconfigure(2, weight=1)
         self._form_visible = False
+        self._vendedores_idx = {}
         self._build()
+        self._load_from_backend()
 
     def _build(self):
         # ── Métricas ──────────────────────────────────────────────────────────
@@ -81,7 +73,7 @@ class EnviosPanel(ctk.CTkFrame):
                 ("vendedor", "Vendedor", 110),
                 ("estado", "Estado", 110),
             ],
-            rows=DEMO_ENVIOS,
+            rows=[],
         )
         self.table.grid(row=2, column=0, sticky="nsew", padx=(24, 8), pady=(0, 20))
         self.table.tree.bind("<<TreeviewSelect>>", self._on_select)
@@ -113,7 +105,7 @@ class EnviosPanel(ctk.CTkFrame):
         self.f_destino = LabeledCombo(row1, "Destino", values=CIUDADES)
         self.f_destino.grid(row=0, column=1, sticky="ew")
 
-        self.f_vendedor = LabeledCombo(inner, "Vendedor", values=VENDEDORES)
+        self.f_vendedor = LabeledCombo(inner, "Vendedor", values=[])
         self.f_vendedor.pack(fill="x", pady=(0, 10))
 
         self.f_direccion = ctk.CTkTextbox(inner, height=60, font=FONT_BODY, fg_color=COLOR_WHITE, border_color=COLOR_BORDER, border_width=1, corner_radius=BTN_CORNER)
@@ -141,15 +133,78 @@ class EnviosPanel(ctk.CTkFrame):
         pass  # Detalle envío futuro
 
     def _on_save(self):
-        """
-        TODO: Conectar con backend.envios.registrar_envio()
-        Datos:
-            guia      = self.f_guia.get()
-            producto  = self.f_producto.get()
-            cliente   = self.f_cliente.get()
-            destino   = self.f_destino.get()
-            vendedor  = self.f_vendedor.get()
-            direccion = self.f_direccion.get("0.0", "end").strip()
-        """
-        pass
+        if not db.is_available():
+            messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
+            return
+
+        guia = self.f_guia.get().strip()
+        producto = self.f_producto.get().strip()
+        cliente = self.f_cliente.get().strip()
+        destino = self.f_destino.get().strip()
+        vendedor_nombre = self.f_vendedor.get().strip()
+        direccion = self.f_direccion.get("0.0", "end").strip()
+
+        if not all([guia, producto, cliente, destino, vendedor_nombre, direccion]):
+            messagebox.showerror("Error", "Completa todos los campos del formulario de envío.")
+            return
+
+        vendedor_id = self._vendedores_idx.get(vendedor_nombre)
+        if not vendedor_id:
+            messagebox.showerror("Error", "No se pudo resolver el vendedor en la base de datos.")
+            return
+
+        data = {
+            "guia": guia,
+            "producto_descripcion": producto,
+            "cliente": cliente,
+            "ciudad_destino": destino,
+            "direccion": direccion,
+            "vendedor_id": vendedor_id,
+        }
+
+        try:
+            backend_envios.registrar_envio(data)
+            self._load_from_backend()
+            self._toggle_form()
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo registrar el envío.\n{exc}")
+
+    # ── Backend helpers ─────────────────────────────────────────────────────────
+    def _load_from_backend(self):
+        if not db.is_available():
+            self.table.load_rows([])
+            return
+
+        try:
+            rows = backend_envios.listar_envios()
+        except Exception:
+            self.table.load_rows([])
+        else:
+            tabla_rows = []
+            for e in rows:
+                tabla_rows.append(
+                    (
+                        e["guia"],
+                        e["fecha"].strftime("%d/%m/%Y") if hasattr(e["fecha"], "strftime") else str(e["fecha"]),
+                        e["producto_descripcion"],
+                        e["ciudad_destino"],
+                        e.get("vendedor", ""),
+                        e.get("estado", "").replace("_", " ").title(),
+                    )
+                )
+            self.table.load_rows(tabla_rows)
+
+        # Vendedores (no admins)
+        try:
+            usuarios = backend_usuarios.listar_usuarios()
+        except Exception:
+            return
+
+        self._vendedores_idx = {
+            u["nombre"]: u["id"] for u in usuarios if u["rol"].upper() != "ADMIN"
+        }
+        if self._vendedores_idx:
+            self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
+            self.f_vendedor.combo.configure(values=list(self._vendedores_idx.keys()))
+
 
