@@ -40,6 +40,10 @@ ControldeInventario/
 
 Cada módulo en `frontend/` es independiente pero integrado en la ventana principal, facilitando el mantenimiento y escalabilidad del sistema.
 
-
-
-
+## imagenes del frontend
+![Login](imagenes/image.png)
+![Dashboard](imagenes/image-1.png)
+![Inventario](imagenes/image-2.png)
+![Ventas](imagenes/image-3.png)
+![Envíos](imagenes/image-4.png)
+![Usuarios](imagenes/image-5.png)
