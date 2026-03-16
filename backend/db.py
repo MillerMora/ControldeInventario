@@ -10,6 +10,25 @@ class BackendUnavailable(Error):
     """
 
 
+def _load_dotenv_if_present():
+    """
+    Carga variables desde .env (si existe) en la raíz del proyecto.
+    No falla si python-dotenv no está instalado o si el archivo no existe.
+    """
+    try:
+        from dotenv import load_dotenv
+    except Exception:
+        return
+
+    # backend/db.py -> raíz del proyecto
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    env_path = os.path.join(project_root, ".env")
+    load_dotenv(env_path, override=False)
+
+
+_load_dotenv_if_present()
+
+
 def get_db_config():
     """
     Lee la configuración de conexión desde variables de entorno.

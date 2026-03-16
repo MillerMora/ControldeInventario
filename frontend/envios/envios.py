@@ -2,6 +2,7 @@
 frontend/envios/envios.py — Panel de Seguimiento de Envíos
 """
 
+import datetime
 import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
@@ -24,6 +25,7 @@ class EnviosPanel(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         self._form_visible = False
         self._vendedores_idx = {}
+        self._envios_rows = []
         self._build()
         self._load_from_backend()
 
@@ -34,20 +36,25 @@ class EnviosPanel(ctk.CTkFrame):
         for i in range(3):
             metrics.grid_columnconfigure(i, weight=1)
 
-        MetricCard(metrics, "Envíos hoy", "12", "5 entregados").grid(row=0, column=0, sticky="ew", padx=(0, 10))
-        MetricCard(metrics, "En tránsito", "3", "+2 vs ayer").grid(row=0, column=1, sticky="ew", padx=(0, 10))
-        MetricCard(metrics, "Pendientes", "2", "Prioridad").grid(row=0, column=2, sticky="ew")
+        self.metric_hoy = MetricCard(metrics, "Envíos hoy", "—", "")
+        self.metric_hoy.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.metric_transito = MetricCard(metrics, "En tránsito", "—", "")
+        self.metric_transito.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+        self.metric_pend = MetricCard(metrics, "Pendientes", "—", "")
+        self.metric_pend.grid(row=0, column=2, sticky="ew")
 
         # ── Barra búsqueda ───────────────────────────────────────────────────
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.grid(row=1, column=0, columnspan=2, sticky="ew", padx=24, pady=(14, 10))
 
-        SearchBar(
+        self.search = SearchBar(
             top,
             placeholder="Buscar por guía, cliente, ciudad...",
             btn_text="+ Nuevo envío",
+            on_search=self._apply_filters,
             on_add=self._toggle_form,
-        ).pack(side="left")
+        )
+        self.search.pack(side="left")
 
         self.ciudad_filter = ctk.CTkComboBox(
             top,
@@ -60,6 +67,7 @@ class EnviosPanel(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY,
         )
         self.ciudad_filter.set("Todas")
+        self.ciudad_filter.configure(command=lambda _v=None: self._apply_filters())
         self.ciudad_filter.pack(side="left", padx=(12, 0))
 
         # ── Tabla envíos ─────────────────────────────────────────────────────
@@ -84,7 +92,13 @@ class EnviosPanel(ctk.CTkFrame):
         panel = ctk.CTkFrame(self, fg_color=COLOR_WHITE, corner_radius=CORNER_R, border_width=1, border_color=COLOR_BORDER, width=280)
         panel.grid_propagate(False)
 
-        inner = ctk.CTkFrame(panel, fg_color="transparent")
+        inner = ctk.CTkScrollableFrame(
+            panel,
+            fg_color="transparent",
+            scrollbar_fg_color=COLOR_CARD_ALT,
+            scrollbar_button_color=COLOR_BORDER_DARK,
+            scrollbar_button_hover_color=COLOR_TEXT_MUTED,
+        )
         inner.pack(fill="both", expand=True, padx=18, pady=16)
 
         ctk.CTkLabel(inner, text="Nuevo envío", font=FONT_HEADING, text_color=COLOR_TEXT_PRIMARY).pack(anchor="w", pady=(0, 14))
@@ -126,6 +140,7 @@ class EnviosPanel(ctk.CTkFrame):
             self.form_panel.grid_remove()
             self._form_visible = False
         else:
+            self._load_from_backend()
             self.form_panel.grid(row=2, column=1, sticky="nsew", padx=(0, 24), pady=(0, 20))
             self._form_visible = True
 
@@ -173,13 +188,20 @@ class EnviosPanel(ctk.CTkFrame):
     def _load_from_backend(self):
         if not db.is_available():
             self.table.load_rows([])
+            self.metric_hoy.set(value="—", sub="404 backend no disponible")
+            self.metric_transito.set(value="—", sub="")
+            self.metric_pend.set(value="—", sub="")
             return
 
         try:
             rows = backend_envios.listar_envios()
         except Exception:
             self.table.load_rows([])
+            self.metric_hoy.set(value="—", sub="Error consultando envíos")
+            self.metric_transito.set(value="—", sub="")
+            self.metric_pend.set(value="—", sub="")
         else:
+            self._envios_rows = rows
             tabla_rows = []
             for e in rows:
                 tabla_rows.append(
@@ -194,6 +216,23 @@ class EnviosPanel(ctk.CTkFrame):
                 )
             self.table.load_rows(tabla_rows)
 
+            # Métricas
+            today = datetime.date.today()
+            env_hoy = 0
+            transito = 0
+            pendientes = 0
+            for e in rows:
+                if e.get("estado") == "EN_TRANSITO":
+                    transito += 1
+                if e.get("estado") == "PENDIENTE":
+                    pendientes += 1
+                fecha = e.get("fecha")
+                if hasattr(fecha, "date") and fecha.date() == today:
+                    env_hoy += 1
+            self.metric_hoy.set(value=str(env_hoy), sub="Hoy")
+            self.metric_transito.set(value=str(transito), sub="Activos")
+            self.metric_pend.set(value=str(pendientes), sub="Prioridad")
+
         # Vendedores (no admins)
         try:
             usuarios = backend_usuarios.listar_usuarios()
@@ -204,7 +243,52 @@ class EnviosPanel(ctk.CTkFrame):
             u["nombre"]: u["id"] for u in usuarios if u["rol"].upper() != "ADMIN"
         }
         if self._vendedores_idx:
-            self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
+            if self.f_vendedor.get() not in self._vendedores_idx:
+                self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
             self.f_vendedor.combo.configure(values=list(self._vendedores_idx.keys()))
+
+        self._apply_filters()
+
+    def _apply_filters(self):
+        """
+        Filtra la tabla usando búsqueda + filtro de ciudad (sin reconsultar MySQL).
+        """
+        if not self._envios_rows:
+            return
+
+        q = (self.search.get() or "").strip().lower()
+        ciudad = (self.ciudad_filter.get() or "Todas").strip()
+
+        filtered = []
+        for e in self._envios_rows:
+            if ciudad != "Todas" and e.get("ciudad_destino") != ciudad:
+                continue
+            haystack = " ".join(
+                [
+                    str(e.get("guia", "")),
+                    str(e.get("cliente", "")),
+                    str(e.get("ciudad_destino", "")),
+                    str(e.get("producto_descripcion", "")),
+                    str(e.get("vendedor", "")),
+                    str(e.get("estado", "")),
+                ]
+            ).lower()
+            if q and q not in haystack:
+                continue
+            filtered.append(e)
+
+        tabla_rows = []
+        for e in filtered:
+            tabla_rows.append(
+                (
+                    e["guia"],
+                    e["fecha"].strftime("%d/%m/%Y") if hasattr(e["fecha"], "strftime") else str(e["fecha"]),
+                    e["producto_descripcion"],
+                    e["ciudad_destino"],
+                    e.get("vendedor", ""),
+                    e.get("estado", "").replace("_", " ").title(),
+                )
+            )
+        self.table.load_rows(tabla_rows)
 
 

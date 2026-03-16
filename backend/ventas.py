@@ -42,6 +42,11 @@ def registrar_venta(data):
     try:
         cur = conn.cursor()
 
+        codigo = data.get("codigo")
+        if not codigo:
+            # Código único y legible (ej: V-20260316153045123456)
+            codigo = f"V-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+
         total_bruto = data["cantidad"] * data["precio_unit"]
         total_neto = total_bruto - data.get("descuento", 0.0)
 
@@ -55,7 +60,7 @@ def registrar_venta(data):
                  'COMPLETADA', %(cliente)s, %(vendedor_id)s, %(notas)s)
             """,
             {
-                "codigo": data.get("codigo"),
+                "codigo": codigo,
                 "fecha": datetime.now(),
                 "total": total_neto,
                 "descuento": data.get("descuento", 0.0),

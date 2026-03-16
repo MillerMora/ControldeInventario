@@ -153,21 +153,42 @@ class MetricCard(ctk.CTkFrame):
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.pack(padx=18, pady=14, fill="both", expand=True)
 
-        ctk.CTkLabel(
+        self._label_lbl = ctk.CTkLabel(
             inner, text=label, font=FONT_SMALL,
             text_color=COLOR_TEXT_MUTED, anchor="w",
-        ).pack(anchor="w")
+        )
+        self._label_lbl.pack(anchor="w")
 
-        ctk.CTkLabel(
+        self._value_lbl = ctk.CTkLabel(
             inner, text=value, font=(FONT_FAMILY, 26, "bold"),
             text_color=COLOR_TEXT_PRIMARY, anchor="w",
-        ).pack(anchor="w", pady=(2, 0))
+        )
+        self._value_lbl.pack(anchor="w", pady=(2, 0))
 
-        if sub:
-            ctk.CTkLabel(
-                inner, text=sub, font=FONT_MICRO,
-                text_color=sub_color or COLOR_TEXT_MUTED, anchor="w",
-            ).pack(anchor="w", pady=(2, 0))
+        self._sub_lbl = ctk.CTkLabel(
+            inner, text=sub or "", font=FONT_MICRO,
+            text_color=sub_color or COLOR_TEXT_MUTED, anchor="w",
+        )
+        self._sub_lbl.pack(anchor="w", pady=(2, 0))
+
+        if not sub:
+            self._sub_lbl.pack_forget()
+
+    def set(self, *, label=None, value=None, sub=None, sub_color=None):
+        if label is not None:
+            self._label_lbl.configure(text=label)
+        if value is not None:
+            self._value_lbl.configure(text=value)
+        if sub is not None:
+            if sub == "":
+                self._sub_lbl.configure(text="")
+                self._sub_lbl.pack_forget()
+            else:
+                self._sub_lbl.configure(text=sub)
+                if not self._sub_lbl.winfo_ismapped():
+                    self._sub_lbl.pack(anchor="w", pady=(2, 0))
+        if sub_color is not None:
+            self._sub_lbl.configure(text_color=sub_color)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

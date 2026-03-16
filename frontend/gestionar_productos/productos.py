@@ -25,6 +25,7 @@ class ProductosPanel(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self._form_visible = False
         self._productos_cache = []
+        self._productos_filtered = []
         self._selected_id = None
         self._build()
         self._load_from_backend()
@@ -35,12 +36,14 @@ class ProductosPanel(ctk.CTkFrame):
         top.grid(row=0, column=0, columnspan=2,
                  sticky="ew", padx=24, pady=(18, 10))
 
-        SearchBar(
+        self.search = SearchBar(
             top,
             placeholder="Buscar por nombre, talla, color...",
             btn_text="+ Nuevo producto",
+            on_search=self._apply_filters,
             on_add=self._toggle_form,
-        ).pack(side="left")
+        )
+        self.search.pack(side="left")
 
         # Filtro de estado
         self.filter_combo = ctk.CTkComboBox(
@@ -54,6 +57,7 @@ class ProductosPanel(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY,
         )
         self.filter_combo.set("Todos")
+        self.filter_combo.configure(command=lambda _v=None: self._apply_filters())
         self.filter_combo.pack(side="left", padx=(12, 0))
 
         # ── Tabla principal ───────────────────────────────────────────────────
@@ -90,7 +94,13 @@ class ProductosPanel(ctk.CTkFrame):
         )
         panel.grid_propagate(False)
 
-        inner = ctk.CTkFrame(panel, fg_color="transparent")
+        inner = ctk.CTkScrollableFrame(
+            panel,
+            fg_color="transparent",
+            scrollbar_fg_color=COLOR_CARD_ALT,
+            scrollbar_button_color=COLOR_BORDER_DARK,
+            scrollbar_button_hover_color=COLOR_TEXT_MUTED,
+        )
         inner.pack(fill="both", expand=True, padx=18, pady=16)
 
         self.form_title_lbl = ctk.CTkLabel(
@@ -165,6 +175,11 @@ class ProductosPanel(ctk.CTkFrame):
             self.form_title_lbl.configure(text="Nuevo producto")
             self.delete_btn.pack_forget()
         else:
+            # Abrir siempre en modo "Nuevo producto" por defecto
+            self._selected_id = None
+            self._clear_form()
+            self.form_title_lbl.configure(text="Nuevo producto")
+            self.delete_btn.pack_forget()
             self.form_panel.grid(
                 row=1, column=1, sticky="nsew",
                 padx=(0, 24), pady=(0, 20),
@@ -279,8 +294,41 @@ class ProductosPanel(ctk.CTkFrame):
             return
 
         self._productos_cache = productos
+        self._productos_filtered = productos
+        self._apply_filters()
+
+    def _apply_filters(self):
+        """
+        Aplica filtro de estado + búsqueda (sin reconsultar MySQL).
+        """
+        if not self._productos_cache:
+            self.table.load_rows([])
+            return
+
+        q = (self.search.get() or "").strip().lower()
+        estado = (self.filter_combo.get() or "Todos").strip()
+
+        filtered = []
+        for p in self._productos_cache:
+            if estado != "Todos" and p.get("estado") != estado:
+                continue
+            haystack = " ".join(
+                [
+                    str(p.get("referencia", "")),
+                    str(p.get("nombre", "")),
+                    str(p.get("talla", "")),
+                    str(p.get("color", "")),
+                    str(p.get("ubicacion", "")),
+                    str(p.get("estado", "")),
+                ]
+            ).lower()
+            if q and q not in haystack:
+                continue
+            filtered.append(p)
+
+        self._productos_filtered = filtered
         rows = []
-        for p in productos:
+        for p in filtered:
             rows.append(
                 (
                     p["referencia"],

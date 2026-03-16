@@ -24,6 +24,7 @@ class UsuariosPanel(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self._form_visible = False
         self._editing_id   = None
+        self._usuarios_cache = []
         self._build()
         self._load_from_backend()
 
@@ -46,7 +47,7 @@ class UsuariosPanel(ctk.CTkFrame):
         )
         self.search_entry.pack(side="left", padx=(0, 8))
 
-        SecondaryButton(top, "Buscar", width=90).pack(side="left", padx=(0, 8))
+        SecondaryButton(top, "Buscar", width=90, command=self._apply_filters).pack(side="left", padx=(0, 8))
 
         self.rol_filter = ctk.CTkComboBox(
             top,
@@ -59,6 +60,7 @@ class UsuariosPanel(ctk.CTkFrame):
             text_color=COLOR_TEXT_PRIMARY,
         )
         self.rol_filter.set("Todos los roles")
+        self.rol_filter.configure(command=lambda _v=None: self._apply_filters())
         self.rol_filter.pack(side="left", padx=(0, 12))
 
         PrimaryButton(top, "+ Nuevo usuario",
@@ -95,7 +97,13 @@ class UsuariosPanel(ctk.CTkFrame):
         )
         panel.grid_propagate(False)
 
-        inner = ctk.CTkFrame(panel, fg_color="transparent")
+        inner = ctk.CTkScrollableFrame(
+            panel,
+            fg_color="transparent",
+            scrollbar_fg_color=COLOR_CARD_ALT,
+            scrollbar_button_color=COLOR_BORDER_DARK,
+            scrollbar_button_hover_color=COLOR_TEXT_MUTED,
+        )
         inner.pack(fill="both", expand=True, padx=20, pady=18)
 
         self.form_title = ctk.CTkLabel(
@@ -294,8 +302,35 @@ class UsuariosPanel(ctk.CTkFrame):
             self.table.load_rows([])
             return
 
+        self._usuarios_cache = usuarios
+        self._apply_filters()
+
+    def _apply_filters(self):
+        if not self._usuarios_cache:
+            self.table.load_rows([])
+            return
+
+        q = (self.search_entry.get() or "").strip().lower()
+        rol = (self.rol_filter.get() or "Todos los roles").strip().upper()
+
+        filtered = []
+        for u in self._usuarios_cache:
+            if rol != "TODOS LOS ROLES" and u.get("rol", "").upper() != rol:
+                continue
+            haystack = " ".join(
+                [
+                    str(u.get("nombre", "")),
+                    str(u.get("usuario", "")),
+                    str(u.get("rol", "")),
+                    str(u.get("estado", "")),
+                ]
+            ).lower()
+            if q and q not in haystack:
+                continue
+            filtered.append(u)
+
         rows = []
-        for u in usuarios:
+        for u in filtered:
             rows.append(
                 (
                     f"U-{u['id']:03d}",

@@ -135,10 +135,10 @@ class DashboardPanel(ctk.CTkFrame):
     def _load_from_backend(self):
         if not db.is_available():
             # Mostrar 404 suave en métricas
-            self.metric_productos.configure(value="—", sub="404 backend no disponible")
-            self.metric_ventas_hoy.configure(value="—", sub="")
-            self.metric_envios.configure(value="—", sub="")
-            self.metric_stock.configure(value="—", sub="")
+            self.metric_productos.set(value="—", sub="404 backend no disponible")
+            self.metric_ventas_hoy.set(value="—", sub="")
+            self.metric_envios.set(value="—", sub="")
+            self.metric_stock.set(value="—", sub="")
             return
 
         # Productos / stock
@@ -149,11 +149,11 @@ class DashboardPanel(ctk.CTkFrame):
             productos = []
             stock_bajo = []
 
-        self.metric_productos.configure(
+        self.metric_productos.set(
             value=str(len(productos)),
             sub="Registrados en inventario",
         )
-        self.metric_stock.configure(
+        self.metric_stock.set(
             value=str(len(stock_bajo)),
             sub="Requieren reposición" if stock_bajo else "Todo en orden",
         )
@@ -167,7 +167,7 @@ class DashboardPanel(ctk.CTkFrame):
         hoy = datetime.date.today()
         ventas_hoy = [v for v in ventas if getattr(v["fecha"], "date", lambda: hoy)() == hoy]
         total_hoy = sum(float(v["total"]) for v in ventas_hoy) if ventas_hoy else 0.0
-        self.metric_ventas_hoy.configure(
+        self.metric_ventas_hoy.set(
             value=f"${total_hoy:.2f}",
             sub=f"{len(ventas_hoy)} transacciones hoy",
         )
@@ -193,7 +193,7 @@ class DashboardPanel(ctk.CTkFrame):
             envs = []
 
         activos = [e for e in envs if e.get("estado") == "EN_TRANSITO"]
-        self.metric_envios.configure(
+        self.metric_envios.set(
             value=str(len(activos)),
             sub=f"{len(envs)} totales",
         )

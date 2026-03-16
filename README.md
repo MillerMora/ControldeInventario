@@ -18,6 +18,13 @@
    - `ALMACOR_DB_USER` (por defecto `almacor_user`)
    - `ALMACOR_DB_PASSWORD` (por defecto `almacor_pass`)
    - `ALMACOR_DB_NAME` (por defecto `almacor_db`)
+   
+   Alternativa recomendada: crea un archivo `.env` en la raíz del proyecto (está ignorado por Git) con:
+   - `ALMACOR_DB_HOST=localhost`
+   - `ALMACOR_DB_PORT=3306`
+   - `ALMACOR_DB_USER=almacor_user`
+   - `ALMACOR_DB_PASSWORD=almacor_pass`
+   - `ALMACOR_DB_NAME=almacor_db`
 6. Abre una terminal en el directorio del proyecto.
 7. Ejecuta: `python main.py`.
 

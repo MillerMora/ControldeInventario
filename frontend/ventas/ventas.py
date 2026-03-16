@@ -2,6 +2,7 @@
 frontend/ventas/ventas.py — Panel de Registro de Ventas
 """
 
+import datetime
 import tkinter.messagebox as messagebox
 import customtkinter as ctk
 from frontend.theme import *
@@ -33,12 +34,12 @@ class VentasPanel(ctk.CTkFrame):
         for i in range(3):
             metrics.grid_columnconfigure(i, weight=1)
 
-        MetricCard(metrics, "Ventas hoy",    "$1,340", "8 transacciones").grid(
-            row=0, column=0, sticky="ew", padx=(0, 10))
-        MetricCard(metrics, "Ventas mes",    "$18,420", "+23% vs mes anterior",
-                   sub_color=COLOR_SUCCESS).grid(row=0, column=1, sticky="ew", padx=(0, 10))
-        MetricCard(metrics, "Ticket promedio", "$167",  "Hoy").grid(
-            row=0, column=2, sticky="ew")
+        self.metric_hoy = MetricCard(metrics, "Ventas hoy", "—", "")
+        self.metric_hoy.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.metric_mes = MetricCard(metrics, "Ventas mes", "—", "")
+        self.metric_mes.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+        self.metric_ticket = MetricCard(metrics, "Ticket promedio", "—", "")
+        self.metric_ticket.grid(row=0, column=2, sticky="ew")
 
         # ── Barra de búsqueda ─────────────────────────────────────────────────
         top = ctk.CTkFrame(self, fg_color="transparent")
@@ -98,7 +99,13 @@ class VentasPanel(ctk.CTkFrame):
         )
         panel.grid_propagate(False)
 
-        inner = ctk.CTkFrame(panel, fg_color="transparent")
+        inner = ctk.CTkScrollableFrame(
+            panel,
+            fg_color="transparent",
+            scrollbar_fg_color=COLOR_CARD_ALT,
+            scrollbar_button_color=COLOR_BORDER_DARK,
+            scrollbar_button_hover_color=COLOR_TEXT_MUTED,
+        )
         inner.pack(fill="both", expand=True, padx=18, pady=16)
 
         ctk.CTkLabel(inner, text="Nueva venta",
@@ -169,6 +176,8 @@ class VentasPanel(ctk.CTkFrame):
             self.form_panel.grid_remove()
             self._form_visible = False
         else:
+            # Refrescar combos antes de abrir el formulario
+            self._load_from_backend()
             self.form_panel.grid(row=2, column=1, sticky="nsew",
                                  padx=(0, 24), pady=(0, 20))
             self._form_visible = True
@@ -222,6 +231,8 @@ class VentasPanel(ctk.CTkFrame):
         try:
             backend_ventas.registrar_venta(data)
             self._load_from_backend()
+            if self.main_window and hasattr(self.main_window, "_update_stock_badge"):
+                self.main_window._update_stock_badge()
             self._toggle_form()
         except Exception as exc:
             messagebox.showerror("Error", f"No se pudo registrar la venta.\n{exc}")
@@ -230,6 +241,9 @@ class VentasPanel(ctk.CTkFrame):
     def _load_from_backend(self):
         if not db.is_available():
             self.table.load_rows([])
+            self.metric_hoy.set(value="—", sub="404 backend no disponible")
+            self.metric_mes.set(value="—", sub="")
+            self.metric_ticket.set(value="—", sub="")
             return
 
         # Cargar ventas
@@ -237,6 +251,9 @@ class VentasPanel(ctk.CTkFrame):
             rows = backend_ventas.listar_ventas()
         except Exception:
             self.table.load_rows([])
+            self.metric_hoy.set(value="—", sub="Error consultando ventas")
+            self.metric_mes.set(value="—", sub="")
+            self.metric_ticket.set(value="—", sub="")
         else:
             tabla_rows = []
             for v in rows:
@@ -253,6 +270,31 @@ class VentasPanel(ctk.CTkFrame):
                 )
             self.table.load_rows(tabla_rows)
 
+            # Métricas
+            today = datetime.date.today()
+            month = today.month
+            year = today.year
+            ventas_hoy = []
+            ventas_mes = []
+            for v in rows:
+                fecha = v.get("fecha")
+                if hasattr(fecha, "date"):
+                    d = fecha.date()
+                else:
+                    continue
+                if d == today:
+                    ventas_hoy.append(v)
+                if d.month == month and d.year == year:
+                    ventas_mes.append(v)
+
+            total_hoy = sum(float(v["total"]) for v in ventas_hoy) if ventas_hoy else 0.0
+            total_mes = sum(float(v["total"]) for v in ventas_mes) if ventas_mes else 0.0
+            ticket_prom = (total_hoy / len(ventas_hoy)) if ventas_hoy else 0.0
+
+            self.metric_hoy.set(value=f"${total_hoy:.2f}", sub=f"{len(ventas_hoy)} transacciones")
+            self.metric_mes.set(value=f"${total_mes:.2f}", sub=f"{len(ventas_mes)} transacciones")
+            self.metric_ticket.set(value=f"${ticket_prom:.2f}", sub="Hoy" if ventas_hoy else "")
+
         # Cargar combos de productos y vendedores
         try:
             productos = backend_productos.listar_productos()
@@ -261,14 +303,16 @@ class VentasPanel(ctk.CTkFrame):
             return
 
         self._productos_idx = {p["nombre"]: p["id"] for p in productos}
-        self._vendedores_idx = {
-            u["nombre"]: u["id"] for u in usuarios if u["rol"].upper() != "ADMIN"
-        }
+        # Vendedores (incluye admin si no hay empleados)
+        empleados = {u["nombre"]: u["id"] for u in usuarios if u["rol"].upper() == "EMPLEADO"}
+        self._vendedores_idx = empleados or {u["nombre"]: u["id"] for u in usuarios}
 
         if self._productos_idx:
-            self.f_producto.set(next(iter(self._productos_idx.keys())))
+            if self.f_producto.get() not in self._productos_idx:
+                self.f_producto.set(next(iter(self._productos_idx.keys())))
             self.f_producto.combo.configure(values=list(self._productos_idx.keys()))
         if self._vendedores_idx:
-            self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
+            if self.f_vendedor.get() not in self._vendedores_idx:
+                self.f_vendedor.set(next(iter(self._vendedores_idx.keys())))
             self.f_vendedor.combo.configure(values=list(self._vendedores_idx.keys()))
 
