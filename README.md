@@ -93,3 +93,6 @@ Los roles soportados por defecto son:
 ![Ventas](imagenes/image-3.png)
 ![Envíos](imagenes/image-4.png)
 ![Usuarios](imagenes/image-5.png)
+
+## Modelo Entidad Relacion
+![alt text](imagenes/MER_almacor.png)
