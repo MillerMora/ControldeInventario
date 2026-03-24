@@ -95,4 +95,6 @@ Los roles soportados por defecto son:
 ![Usuarios](imagenes/image-5.png)
 
 ## Modelo Entidad Relacion
-![alt text](imagenes/MER_almacor.png)
+![MER](imagenes/MER_almacor.png)
+## Diccionario de datos
+![diccionario de datos](imagenes/diccionario%20de%20datos.pdf)
