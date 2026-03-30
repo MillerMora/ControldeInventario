@@ -287,19 +287,47 @@ class ProductosPanel(ctk.CTkFrame):
         if not db.is_available():
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
+        
         try:
-            backend_productos.eliminar_producto(self._selected_id)
+            # Verificar dependencias ANTES de eliminar
+            delete_info = backend_productos.get_delete_info(self._selected_id)
+            print(f"[UI productos] Delete info: {delete_info}")
+            
+            if delete_info['dependencias'] == 0:
+                # Sin dependencias: eliminar directamente
+                backend_productos.eliminar_producto(self._selected_id)
+                messagebox.showinfo("Éxito", "Producto eliminado correctamente.")
+            else:
+                # Con dependencias: mostrar confirmación
+                msg = (f"¡ADVERTENCIA!\n\n"
+                       f"Este producto está asociado a {delete_info['dependencias']} venta(s).\n\n"
+                       f"Si lo eliminas:\n"
+                       f"• El producto desaparecerá del inventario\n"
+                       f"• Las ventas históricas mantendrán la referencia (integridad preservada)\n\n"
+                       f"¿Deseas continuar con la eliminación?")
+                
+                result = messagebox.askyesno("Confirmar eliminación", msg, icon="warning")
+                if result:
+                    backend_productos.eliminar_producto(self._selected_id)
+                    messagebox.showinfo("Éxito", 
+                        f"Producto eliminado.\n"
+                        f"Las {delete_info['dependencias']} ventas mantienen referencia histórica.")
+                else:
+                    print("[UI productos] Delete cancelled by user")
+                    return
+            
+            # Refresh UI
             print("[UI productos] Backend delete OK")
             self._selected_id = None
             self._load_from_backend()
-            print("[UI productos] Reload after delete")
             self.table.tree.selection_remove(self.table.tree.selection())
             self._toggle_form()
             self.after(200, self._apply_filters)
             print("[UI productos] Delete UI done")
+            
         except Exception as exc:
             print(f"[UI productos ERROR delete] {exc}")
-            messagebox.showerror("Error", f"No se pudo eliminar el producto.\n{exc}")
+            messagebox.showerror("Error", f"No se pudo eliminar el producto.\n{str(exc)}")
 
     # ── Backend helpers ─────────────────────────────────────────────────────────
     def _load_from_backend(self):
@@ -367,3 +395,4 @@ class ProductosPanel(ctk.CTkFrame):
             )
         print(f"[UI productos] Table updated with {len(rows)} rows")
         self.table.load_rows(rows)
+

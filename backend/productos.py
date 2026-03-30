@@ -70,6 +70,27 @@ def actualizar_producto(producto_id, data):
     db.execute(sql, params)
 
 
+def get_delete_info(producto_id):
+    """
+    Verifica dependencias antes de eliminar producto.
+    Retorna info para mostrar en UI de confirmación.
+    """
+    sql_count = """
+        SELECT COUNT(*) as dependencias 
+        FROM ventas_detalle vd 
+        WHERE vd.producto_id = %(id)s
+    """
+    result = db.query_one(sql_count, {"id": producto_id})
+    count = result["dependencias"] if result else 0
+    
+    info = {
+        "dependencias": count,
+        "puede_eliminar": count == 0,
+        "mensaje": f"Este producto está asociado a {count} venta(s)." if count > 0 else "No hay dependencias."
+    }
+    return info
+
+
 def eliminar_producto(producto_id):
     sql = "DELETE FROM productos WHERE id = %(id)s"
     db.execute(sql, {"id": producto_id})

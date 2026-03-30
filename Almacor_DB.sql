@@ -49,16 +49,16 @@ CREATE TABLE IF NOT EXISTS ventas (
   FOREIGN KEY (vendedor_id) REFERENCES usuarios(id)
 );
 
--- Detalle de ventas
+-- Detalle de ventas (FIX: producto_id NULLABLE + ON DELETE SET NULL)
 CREATE TABLE IF NOT EXISTS ventas_detalle (
   id INT AUTO_INCREMENT PRIMARY KEY,
   venta_id INT NOT NULL,
-  producto_id INT NOT NULL,
+  producto_id INT NULL,
   talla VARCHAR(30) NOT NULL,
   cantidad INT NOT NULL,
   precio_unit DECIMAL(10,2) NOT NULL,
   FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
-  FOREIGN KEY (producto_id) REFERENCES productos(id)
+  FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
 );
 
 -- Envíos
@@ -194,3 +194,10 @@ INSERT INTO ventas_detalle (venta_id, producto_id, talla, cantidad, precio_unit)
 (12,19,'Uni',1,149.99),
 (1,20,'L',1,19.99),
 (2,7,'41',1,129.99);
+
+-- MIGRACION para DBs existentes (ejecutar UNA VEZ después del primer cambio)
+-- ALTER TABLE ventas_detalle MODIFY COLUMN producto_id INT NULL;
+-- ALTER TABLE ventas_detalle DROP FOREIGN KEY ventas_detalle_ibfk_2; 
+-- ALTER TABLE ventas_detalle ADD CONSTRAINT fk_ventas_detalle_producto 
+--   FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL;
+
