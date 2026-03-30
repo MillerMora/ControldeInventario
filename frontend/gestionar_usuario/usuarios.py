@@ -73,6 +73,7 @@ class UsuariosPanel(ctk.CTkFrame):
                 ("id",      "ID",          65),
                 ("nombre",  "Nombre",     160),
                 ("usuario", "Usuario",    120),
+                ("email",   "Email",      160),
                 ("rol",     "Rol",         95),
                 ("estado",  "Estado",      95),
                 ("ultimo",  "Último acceso", 115),
@@ -120,6 +121,10 @@ class UsuariosPanel(ctk.CTkFrame):
         self.f_usuario = LabeledEntry(inner, "Nombre de usuario",
                                       placeholder="usuario123")
         self.f_usuario.pack(fill="x", pady=(0, 10))
+
+        self.f_email = LabeledEntry(inner, "Email",
+                                    placeholder="usuario@ejemplo.com")
+        self.f_email.pack(fill="x", pady=(0, 10))
 
         self.f_password = LabeledEntry(inner, "Contraseña",
                                        placeholder="Mínimo 6 caracteres", show="•")
@@ -197,12 +202,13 @@ class UsuariosPanel(ctk.CTkFrame):
         if not data:
             print("[UI] No row selected")
             return
-        uid, nombre, usuario, rol, estado, _ = data
+        uid, nombre, usuario, email, rol, estado, _ = data
         self._editing_id = int(uid[2:]) if uid.startswith('U-') else uid  # Parse to int
         print(f"[UI usuarios] Selected ID: {self._editing_id} (raw: {uid})")
         self.form_title.configure(text=f"Editar — {usuario}")
         self.f_nombre.set(nombre)
         self.f_usuario.set(usuario)
+        self.f_email.set(email)
         self.f_rol.set(rol)
         self.f_estado.set(estado)
         self.f_password.clear()
@@ -222,11 +228,10 @@ class UsuariosPanel(ctk.CTkFrame):
         self._clear_form()
 
     def _clear_form(self):
-        for field in [self.f_nombre, self.f_usuario, self.f_password, self.f_confirm]:
+    
             field.clear()
-        self.f_rol.set(ROLES[0])
-        self.f_estado.set("ACTIVO")
-
+            self.f_rol.set(ROLES[0])
+            self.f_estado.set("ACTIVO")
     def _on_save(self):
         print(f"[UI usuarios] Save clicked, editing_id={self._editing_id}")
         if not db.is_available():
@@ -236,6 +241,7 @@ class UsuariosPanel(ctk.CTkFrame):
 
         nombre = self.f_nombre.get().strip()
         usuario = self.f_usuario.get().strip()
+        email = self.f_email.get().strip()
         password = self.f_password.get().strip()
         confirm = self.f_confirm.get().strip()
         rol_nombre = self.f_rol.get().strip().upper()
@@ -268,6 +274,7 @@ class UsuariosPanel(ctk.CTkFrame):
         data = {
             "nombre": nombre,
             "usuario": usuario,
+            "email": email,
             "password": password or None,
             "rol_id": rol_id,
             "estado": estado,
@@ -370,6 +377,7 @@ class UsuariosPanel(ctk.CTkFrame):
                 [
                     str(u.get("nombre", "")),
                     str(u.get("usuario", "")),
+                    str(u.get("email", "")),
                     str(u.get("rol", "")),
                     str(u.get("estado", "")),
                 ]
@@ -385,6 +393,7 @@ class UsuariosPanel(ctk.CTkFrame):
                     f"U-{u['id']:03d}",
                     u["nombre"],
                     u["usuario"],
+                    u.get("email", ""),
                     u["rol"].capitalize(),
                     "Activo" if u["estado"].upper() == "ACTIVO" else "Inactivo",
                     "",
