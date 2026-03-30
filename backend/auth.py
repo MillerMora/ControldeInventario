@@ -8,21 +8,22 @@ def _verify_password(plain_password: str, password_hash: str) -> bool:
     return plain_password == password_hash
 
 
-def login_user(username: str, password: str):
+def login_user(credential: str, password: str):
     """
     Valida credenciales contra la tabla usuarios.
+    Acepta USUARIO o EMAIL como primer parámetro.
 
     Devuelve dict con:
         {id, nombre, usuario, rol, es_admin}
     o None si las credenciales no son válidas.
     """
     sql = """
-        SELECT u.id, u.nombre, u.usuario, u.password_hash, r.nombre AS rol
+        SELECT u.id, u.nombre, u.usuario, u.email, u.password_hash, r.nombre AS rol
         FROM usuarios u
         JOIN roles r ON r.id = u.rol_id
-        WHERE u.usuario = %(usuario)s AND u.estado = 'ACTIVO'
+        WHERE (u.usuario = %(cred)s OR u.email = %(cred)s) AND u.estado = 'ACTIVO'
     """
-    row = db.query_one(sql, {"usuario": username})
+    row = db.query_one(sql, {"cred": credential})
     if not row:
         return None
 

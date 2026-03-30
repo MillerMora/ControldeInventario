@@ -160,7 +160,7 @@ class LoginWindow(ctk.CTk):
             self._show_404()
             return
 
-        user = auth.login_user(usuario, password)
+        user = auth.login_user(usuario, password)  # Acepta usuario o email
         if not user:
             self._show_error("Usuario o contraseña incorrectos.")
             return

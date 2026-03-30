@@ -1,3 +1,4 @@
+DROP DATABASE IF EXISTS almacor_db;
 CREATE DATABASE IF NOT EXISTS almacor_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(150) NOT NULL,
+  email VARCHAR(100) UNIQUE,
   usuario VARCHAR(80) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   rol_id INT NOT NULL,
@@ -84,19 +86,19 @@ INSERT IGNORE INTO roles (id, nombre) VALUES
 -- user/password pairs:
 -- admin/admin123, juanp/pass123, mariacl/pass456, etc.
 
-INSERT INTO usuarios (nombre, usuario, password_hash, rol_id, estado, ultimo_acceso) VALUES
-('Admin Principal', 'admin', 'admin123', 1, 'ACTIVO', '2024-10-01 10:00:00'),
-('Juan Pérez', 'juanp', 'pass123', 2, 'ACTIVO', '2024-10-02 11:30:00'),
-('María López', 'mariacl', 'pass456', 2, 'ACTIVO', '2024-10-03 14:20:00'),
-('Carlos García', 'carlosg', 'pass789', 2, 'ACTIVO', '2024-10-04 09:15:00'),
-('Ana Rodríguez', 'anar', 'passabc', 1, 'ACTIVO', '2024-10-05 16:45:00'),
-('Luis Martínez', 'luism', 'passdef', 2, 'INACTIVO', '2024-10-06 12:10:00'),
-('Sofía Hernández', 'sofiah', 'passghi', 2, 'ACTIVO', NULL),
-('Diego Sánchez', 'diegos', 'passjkl', 1, 'ACTIVO', '2024-10-08 13:25:00'),
-('Laura Torres', 'laurat', 'passmno', 2, 'ACTIVO', '2024-10-09 10:50:00'),
-('Miguel Ramírez', 'miguelr', 'passpqr', 2, 'ACTIVO', '2024-10-10 15:30:00'),
-('Elena Vargas', 'elenav', 'passstu', 1, 'ACTIVO', NULL),
-('Pedro Castillo', 'pedroc', 'passvwx', 2, 'ACTIVO', '2024-10-12 11:00:00');
+INSERT INTO usuarios (nombre, email, usuario, password_hash, rol_id, estado, ultimo_acceso) VALUES
+('Admin Principal', 'admin@almacor.com', 'admin', 'admin123', 1, 'ACTIVO', '2024-10-01 10:00:00'),
+('Juan Pérez', 'juan.perez@almacor.com', 'juanp', 'pass123', 2, 'ACTIVO', '2024-10-02 11:30:00'),
+('María López', 'maria.lopez@almacor.com', 'mariacl', 'pass456', 2, 'ACTIVO', '2024-10-03 14:20:00'),
+('Carlos García', 'carlos.garcia@almacor.com', 'carlosg', 'pass789', 2, 'ACTIVO', '2024-10-04 09:15:00'),
+('Ana Rodríguez', 'ana.rodriguez@almacor.com', 'anar', 'passabc', 1, 'ACTIVO', '2024-10-05 16:45:00'),
+('Luis Martínez', 'luis.martinez@almacor.com', 'luism', 'passdef', 2, 'INACTIVO', '2024-10-06 12:10:00'),
+('Sofía Hernández', 'sofia.hernandez@almacor.com', 'sofiah', 'passghi', 2, 'ACTIVO', NULL),
+('Diego Sánchez', 'diego.sanchez@almacor.com', 'diegos', 'passjkl', 1, 'ACTIVO', '2024-10-08 13:25:00'),
+('Laura Torres', 'laura.torres@almacor.com', 'laurat', 'passmno', 2, 'ACTIVO', '2024-10-09 10:50:00'),
+('Miguel Ramírez', 'miguel.ramirez@almacor.com', 'miguelr', 'passpqr', 2, 'ACTIVO', '2024-10-10 15:30:00'),
+('Elena Vargas', 'elena.vargas@almacor.com', 'elenav', 'passstu', 1, 'ACTIVO', NULL),
+('Pedro Castillo', 'pedro.castillo@almacor.com', 'pedroc', 'passvwx', 2, 'ACTIVO', '2024-10-12 11:00:00');
 
 -- 20 Productos
 INSERT INTO productos (referencia, nombre, talla, color, stock_actual, stock_minimo, ubicacion, precio) VALUES
