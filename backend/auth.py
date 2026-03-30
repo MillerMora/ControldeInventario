@@ -1,12 +1,11 @@
-import bcrypt
 from . import db
 
 
-def _verify_password(plain_password: str, password_hash: bytes) -> bool:
-    try:
-        return bcrypt.checkpw(plain_password.encode("utf-8"), password_hash)
-    except ValueError:
-        return False
+def _verify_password(plain_password: str, password_hash: str) -> bool:
+    """
+    Compare plain text passwords directly (INSECURE - per user request)
+    """
+    return plain_password == password_hash
 
 
 def login_user(username: str, password: str):
@@ -27,9 +26,7 @@ def login_user(username: str, password: str):
     if not row:
         return None
 
-    password_hash = row.get("password_hash")
-    if isinstance(password_hash, str):
-        password_hash = password_hash.encode("utf-8")
+    password_hash = row.get("password_hash")  # Already str from VARCHAR
 
     if not _verify_password(password, password_hash):
         return None
@@ -43,4 +40,3 @@ def login_user(username: str, password: str):
         "rol": rol,
         "es_admin": es_admin,
     }
-

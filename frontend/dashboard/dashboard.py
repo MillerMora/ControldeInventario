@@ -96,7 +96,7 @@ class DashboardPanel(ctk.CTkFrame):
             bottom,
             columns=[
                 ("guia",    "Guía",      70),
-                ("cliente", "Cliente",   90),
+                ("producto", "Producto",  90),
                 ("ciudad",  "Ciudad",    80),
                 ("estado",  "Estado",    95),
             ],
@@ -200,10 +200,11 @@ class DashboardPanel(ctk.CTkFrame):
 
         tabla_envios = []
         for e in envs[:5]:
+            producto = e["producto_descripcion"][:25] + "..." if len(e["producto_descripcion"]) > 25 else e["producto_descripcion"]
             tabla_envios.append(
                 (
                     e["guia"],
-                    e["cliente"],
+                    producto,
                     e["ciudad_destino"],
                     e.get("estado", "").replace("_", " ").title(),
                 )

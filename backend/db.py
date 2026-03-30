@@ -37,8 +37,8 @@ def get_db_config():
     return {
         "host": os.getenv("ALMACOR_DB_HOST", "localhost"),
         "port": int(os.getenv("ALMACOR_DB_PORT", "3306")),
-        "user": os.getenv("ALMACOR_DB_USER", "almacor_user"),
-        "password": os.getenv("ALMACOR_DB_PASSWORD", "almacor_pass"),
+        "user": os.getenv("ALMACOR_DB_USER", "root"),
+        "password": os.getenv("ALMACOR_DB_PASSWORD", ""),
         "database": os.getenv("ALMACOR_DB_NAME", "almacor_db"),
     }
 
@@ -50,14 +50,16 @@ def _get_pool():
     global _POOL
     if _POOL is None:
         cfg = get_db_config()
+        print(f"[DB POOL] Config: host={cfg['host']}, user={cfg['user']}, db={cfg['database']}")
         try:
             _POOL = pooling.MySQLConnectionPool(
                 pool_name="almacor_pool",
                 pool_size=5,
                 **cfg,
             )
+            print("[DB POOL] Pool created successfully")
         except Error as exc:
-            # Cualquier problema de conexión se traduce en un BackendUnavailable
+            print(f"[DB POOL ERROR] {exc}")
             raise BackendUnavailable(str(exc)) from exc
     return _POOL
 
@@ -67,32 +69,53 @@ def get_connection():
     Devuelve una conexión desde el pool.
     Debe cerrarse siempre después de usarse (conn.close()).
     """
+    print("[DB] Getting connection...")
     try:
-        return _get_pool().get_connection()
+        conn = _get_pool().get_connection()
+        print("[DB] Connection obtained")
+        return conn
     except Error as exc:
+        print(f"[DB ERROR connect] {exc}")
         raise BackendUnavailable(str(exc)) from exc
 
 
 def query_one(sql, params=None):
+    print(f"[DB QUERY ONE] SQL: {sql}")
+    if params:
+        print(f"[DB PARAMS] {params}")
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
         cur.execute(sql, params or {})
         row = cur.fetchone()
         cur.close()
+        if row:
+            print(f"[DB RESULT ONE] Found row")
+        else:
+            print("[DB RESULT ONE] No row found")
         return row
+    except Error as exc:
+        print(f"[DB ERROR query_one] {exc}")
+        raise
     finally:
         conn.close()
 
 
 def query_all(sql, params=None):
+    print(f"[DB QUERY ALL] SQL: {sql}")
+    if params:
+        print(f"[DB PARAMS] {params}")
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
         cur.execute(sql, params or {})
         rows = cur.fetchall()
         cur.close()
+        print(f"[DB RESULT ALL] Found {len(rows)} rows")
         return rows
+    except Error as exc:
+        print(f"[DB ERROR query_all] {exc}")
+        raise
     finally:
         conn.close()
 
@@ -101,6 +124,9 @@ def execute(sql, params=None):
     """
     Ejecuta INSERT/UPDATE/DELETE y devuelve el último id insertado (si aplica).
     """
+    print(f"[DB EXECUTE] SQL: {sql}")
+    if params:
+        print(f"[DB PARAMS] {params}")
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -108,7 +134,13 @@ def execute(sql, params=None):
         last_id = cur.lastrowid
         conn.commit()
         cur.close()
+        print(f"[DB EXECUTE] Success, affected rows=1, last_id={last_id}")
         return last_id
+    except Error as exc:
+        print(f"[DB ERROR execute] {exc}")
+        if conn:
+            conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -119,8 +151,12 @@ def is_available() -> bool:
     Nunca lanza excepción (solo True/False).
     """
     try:
+        print("[DB] Checking availability...")
         conn = get_connection()
         conn.close()
+        print("[DB] Available")
         return True
     except BackendUnavailable:
+        print("[DB] Not available")
         return False
+

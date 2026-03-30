@@ -1,11 +1,9 @@
-import bcrypt
 from . import db
 
 
 def crear_usuario(data):
-    password_hash = bcrypt.hashpw(
-        data["password"].encode("utf-8"), bcrypt.gensalt()
-    )
+    # Plain text password (INSECURE - per user request)
+    password_hash = data["password"]
     sql = """
         INSERT INTO usuarios
             (nombre, usuario, password_hash, rol_id, estado)
@@ -35,9 +33,7 @@ def actualizar_usuario(user_id, data):
     }
     if data.get("password"):
         fields.append("password_hash = %(password_hash)s")
-        params["password_hash"] = bcrypt.hashpw(
-            data["password"].encode("utf-8"), bcrypt.gensalt()
-        )
+        params["password_hash"] = data["password"]  # Plain text (INSECURE)
 
     sql = "UPDATE usuarios SET " + ", ".join(fields) + " WHERE id = %(id)s"
     db.execute(sql, params)
@@ -67,4 +63,3 @@ def obtener_rol_id_por_nombre(nombre_rol: str):
     sql = "SELECT id FROM roles WHERE UPPER(nombre) = UPPER(%(nombre)s)"
     row = db.query_one(sql, {"nombre": nombre_rol})
     return row["id"] if row else None
-

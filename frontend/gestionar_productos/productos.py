@@ -187,17 +187,20 @@ class ProductosPanel(ctk.CTkFrame):
             self._form_visible = True
 
     def _on_select(self, _event=None):
+        print("[UI productos] Selection event")
         data = self.table.get_selected()
         if not data:
+            print("[UI productos] No row selected")
             self._selected_id = None
             return
-        # Rellenar formulario con datos de la fila seleccionada
         ref, nombre, talla, color, stock, ubicacion, estado, precio = data
         # Buscar el ID real en caché
+        self._selected_id = None
         for p in self._productos_cache:
             if p["referencia"] == ref:
                 self._selected_id = p["id"]
                 break
+        print(f"[UI productos] Selected ID: {self._selected_id} (ref: {ref})")
 
         if not self._form_visible:
             self._toggle_form()
@@ -225,6 +228,7 @@ class ProductosPanel(ctk.CTkFrame):
         self.f_estado.set(ESTADOS[0])
 
     def _on_save(self):
+        print(f"[UI productos] Save clicked, selected_id={self._selected_id}")
         if not db.is_available():
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
@@ -260,36 +264,55 @@ class ProductosPanel(ctk.CTkFrame):
         try:
             if self._selected_id is None:
                 backend_productos.crear_producto(data)
+                print("[UI productos] Created new")
             else:
                 backend_productos.actualizar_producto(self._selected_id, data)
+                print("[UI productos] Updated")
+            print("[UI productos] Backend success, reloading...")
             self._load_from_backend()
+            print("[UI productos] Reloaded")
+            self.table.tree.selection_remove(self.table.tree.selection())
             self._toggle_form()
+            self.after(200, self._apply_filters)
+            print("[UI productos] UI updated")
         except Exception as exc:
+            print(f"[UI productos ERROR] {exc}")
             messagebox.showerror("Error", f"No se pudo guardar el producto.\n{exc}")
 
     def _on_delete(self):
+        print(f"[UI productos] Delete clicked, id={self._selected_id}")
         if self._selected_id is None:
+            print("[UI productos] No ID")
             return
         if not db.is_available():
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
         try:
             backend_productos.eliminar_producto(self._selected_id)
+            print("[UI productos] Backend delete OK")
             self._selected_id = None
             self._load_from_backend()
+            print("[UI productos] Reload after delete")
+            self.table.tree.selection_remove(self.table.tree.selection())
             self._toggle_form()
+            self.after(200, self._apply_filters)
+            print("[UI productos] Delete UI done")
         except Exception as exc:
+            print(f"[UI productos ERROR delete] {exc}")
             messagebox.showerror("Error", f"No se pudo eliminar el producto.\n{exc}")
 
     # ── Backend helpers ─────────────────────────────────────────────────────────
     def _load_from_backend(self):
+        print("[UI productos] Loading backend...")
         if not db.is_available():
-            # Dejar tabla vacía pero no cerrar la app
+            print("[UI productos] DB unavailable")
             self.table.load_rows([])
             return
         try:
             productos = backend_productos.listar_productos()
-        except Exception:
+            print(f"[UI productos] Loaded {len(productos)} from backend")
+        except Exception as exc:
+            print(f"[UI productos ERROR load] {exc}")
             self.table.load_rows([])
             return
 
@@ -301,6 +324,7 @@ class ProductosPanel(ctk.CTkFrame):
         """
         Aplica filtro de estado + búsqueda (sin reconsultar MySQL).
         """
+        print("[UI productos] Applying filters...")
         if not self._productos_cache:
             self.table.load_rows([])
             return
@@ -341,4 +365,5 @@ class ProductosPanel(ctk.CTkFrame):
                     f"${p['precio']:.2f}",
                 )
             )
+        print(f"[UI productos] Table updated with {len(rows)} rows")
         self.table.load_rows(rows)

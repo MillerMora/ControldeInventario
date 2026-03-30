@@ -1,4 +1,3 @@
-
 CREATE DATABASE IF NOT EXISTS almacor_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
@@ -16,7 +15,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(150) NOT NULL,
   usuario VARCHAR(80) NOT NULL UNIQUE,
-  password_hash VARBINARY(255) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
   rol_id INT NOT NULL,
   estado ENUM('ACTIVO','INACTIVO') NOT NULL DEFAULT 'ACTIVO',
   ultimo_acceso DATETIME NULL,
@@ -81,24 +80,23 @@ INSERT IGNORE INTO roles (id, nombre) VALUES
   (1, 'ADMIN'),
   (2, 'EMPLEADO');
 
--- Usuario admin por defecto (password: admin)
--- El hash debe generarse con bcrypt desde la aplicación.
-
--- Datos de prueba para todas las tablas (al menos 10 registros cada una)
+-- Usuarios de prueba con contraseñas en PLAIN TEXT (INSECURE - solo desarrollo)
+-- user/password pairs:
+-- admin/admin123, juanp/pass123, mariacl/pass456, etc.
 
 INSERT INTO usuarios (nombre, usuario, password_hash, rol_id, estado, ultimo_acceso) VALUES
-('Admin Principal', 'admin', UNHEX(SHA2('admin123', 256)), 1, 'ACTIVO', '2024-10-01 10:00:00'),
-('Juan Pérez', 'juanp', UNHEX(SHA2('pass123', 256)), 2, 'ACTIVO', '2024-10-02 11:30:00'),
-('María López', 'mariacl', UNHEX(SHA2('pass456', 256)), 2, 'ACTIVO', '2024-10-03 14:20:00'),
-('Carlos García', 'carlosg', UNHEX(SHA2('pass789', 256)), 2, 'ACTIVO', '2024-10-04 09:15:00'),
-('Ana Rodríguez', 'anar', UNHEX(SHA2('passabc', 256)), 1, 'ACTIVO', '2024-10-05 16:45:00'),
-('Luis Martínez', 'luism', UNHEX(SHA2('passdef', 256)), 2, 'INACTIVO', '2024-10-06 12:10:00'),
-('Sofía Hernández', 'sofiah', UNHEX(SHA2('passghi', 256)), 2, 'ACTIVO', NULL),
-('Diego Sánchez', 'diegos', UNHEX(SHA2('passjkl', 256)), 1, 'ACTIVO', '2024-10-08 13:25:00'),
-('Laura Torres', 'laurat', UNHEX(SHA2('passmno', 256)), 2, 'ACTIVO', '2024-10-09 10:50:00'),
-('Miguel Ramírez', 'miguelr', UNHEX(SHA2('passpqr', 256)), 2, 'ACTIVO', '2024-10-10 15:30:00'),
-('Elena Vargas', 'elenav', UNHEX(SHA2('passstu', 256)), 1, 'ACTIVO', NULL),
-('Pedro Castillo', 'pedroc', UNHEX(SHA2('passvwx', 256)), 2, 'ACTIVO', '2024-10-12 11:00:00');
+('Admin Principal', 'admin', 'admin123', 1, 'ACTIVO', '2024-10-01 10:00:00'),
+('Juan Pérez', 'juanp', 'pass123', 2, 'ACTIVO', '2024-10-02 11:30:00'),
+('María López', 'mariacl', 'pass456', 2, 'ACTIVO', '2024-10-03 14:20:00'),
+('Carlos García', 'carlosg', 'pass789', 2, 'ACTIVO', '2024-10-04 09:15:00'),
+('Ana Rodríguez', 'anar', 'passabc', 1, 'ACTIVO', '2024-10-05 16:45:00'),
+('Luis Martínez', 'luism', 'passdef', 2, 'INACTIVO', '2024-10-06 12:10:00'),
+('Sofía Hernández', 'sofiah', 'passghi', 2, 'ACTIVO', NULL),
+('Diego Sánchez', 'diegos', 'passjkl', 1, 'ACTIVO', '2024-10-08 13:25:00'),
+('Laura Torres', 'laurat', 'passmno', 2, 'ACTIVO', '2024-10-09 10:50:00'),
+('Miguel Ramírez', 'miguelr', 'passpqr', 2, 'ACTIVO', '2024-10-10 15:30:00'),
+('Elena Vargas', 'elenav', 'passstu', 1, 'ACTIVO', NULL),
+('Pedro Castillo', 'pedroc', 'passvwx', 2, 'ACTIVO', '2024-10-12 11:00:00');
 
 -- 20 Productos
 INSERT INTO productos (referencia, nombre, talla, color, stock_actual, stock_minimo, ubicacion, precio) VALUES
@@ -196,5 +194,3 @@ INSERT INTO ventas_detalle (venta_id, producto_id, talla, cantidad, precio_unit)
 (12,19,'Uni',1,149.99),
 (1,20,'L',1,19.99),
 (2,7,'41',1,129.99);
-
-

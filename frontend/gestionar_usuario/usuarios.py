@@ -192,11 +192,14 @@ class UsuariosPanel(ctk.CTkFrame):
             self._open_form()
 
     def _on_select(self, _event=None):
+        print("[UI usuarios] Selection event")
         data = self.table.get_selected()
         if not data:
+            print("[UI] No row selected")
             return
         uid, nombre, usuario, rol, estado, _ = data
-        self._editing_id = uid
+        self._editing_id = int(uid[2:]) if uid.startswith('U-') else uid  # Parse to int
+        print(f"[UI usuarios] Selected ID: {self._editing_id} (raw: {uid})")
         self.form_title.configure(text=f"Editar — {usuario}")
         self.f_nombre.set(nombre)
         self.f_usuario.set(usuario)
@@ -225,7 +228,9 @@ class UsuariosPanel(ctk.CTkFrame):
         self.f_estado.set("ACTIVO")
 
     def _on_save(self):
+        print(f"[UI usuarios] Save clicked, editing_id={self._editing_id}")
         if not db.is_available():
+            print("[UI] DB not available")
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
 
@@ -250,7 +255,9 @@ class UsuariosPanel(ctk.CTkFrame):
 
         try:
             rol_id = backend_usuarios.obtener_rol_id_por_nombre(rol_nombre)
+            print(f"[UI] Rol ID: {rol_id}")
         except Exception as exc:
+            print(f"[UI ERROR rol] {exc}")
             messagebox.showerror("Error", f"No se pudo obtener el rol.\n{exc}")
             return
 
@@ -269,36 +276,57 @@ class UsuariosPanel(ctk.CTkFrame):
         try:
             if self._editing_id is None:
                 backend_usuarios.crear_usuario(data)
+                print("[UI] Created new user")
             else:
                 backend_usuarios.actualizar_usuario(self._editing_id, data)
+                print("[UI] Updated user")
+            print("[UI] Backend success, reloading...")
             self._load_from_backend()
+            print("[UI] Reload done, clearing selection")
+            self.table.tree.selection_remove(self.table.tree.selection())
             self._close_form()
+            self.after(200, self._apply_filters)
+            print("[UI] UI updated")
         except Exception as exc:
+            print(f"[UI ERROR save] {exc}")
             messagebox.showerror("Error", f"No se pudo guardar el usuario.\n{exc}")
 
     def _on_delete(self):
+        print(f"[UI usuarios] Delete clicked, id={self._editing_id}")
         if self._editing_id is None:
+            print("[UI] No ID for delete")
             return
         if not db.is_available():
+            print("[UI] DB not available")
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
         try:
             backend_usuarios.eliminar_usuario(self._editing_id)
+            print("[UI] Backend delete success")
             self._editing_id = None
             self._load_from_backend()
+            print("[UI] Reload after delete")
+            self.table.tree.selection_remove(self.table.tree.selection())
             self._close_form()
+            self.after(200, self._apply_filters)
+            print("[UI] Delete UI updated")
         except Exception as exc:
+            print(f"[UI ERROR delete] {exc}")
             messagebox.showerror("Error", f"No se pudo eliminar el usuario.\n{exc}")
 
     # ── Backend helpers ─────────────────────────────────────────────────────────
     def _load_from_backend(self):
+        print("[UI usuarios] _load_from_backend called")
         if not db.is_available():
+            print("[UI] DB unavailable in load")
             self.table.load_rows([])
             return
 
         try:
             usuarios = backend_usuarios.listar_usuarios()
-        except Exception:
+            print(f"[UI] Loaded {len(usuarios)} users from backend")
+        except Exception as exc:
+            print(f"[UI ERROR load] {exc}")
             self.table.load_rows([])
             return
 
@@ -341,4 +369,6 @@ class UsuariosPanel(ctk.CTkFrame):
                     "",
                 )
             )
+        print(f"[UI] Applying filters, {len(rows)} rows to table")
         self.table.load_rows(rows)
+
