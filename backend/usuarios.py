@@ -39,6 +39,38 @@ def actualizar_usuario(user_id, data):
     db.execute(sql, params)
 
 
+def get_delete_info(user_id):
+    """
+    Verifica dependencias antes de eliminar usuario.
+    Retorna info para mostrar en UI de confirmación.
+    """
+    sql_ventas = """
+        SELECT COUNT(*) as ventas 
+        FROM ventas 
+        WHERE vendedor_id = %(id)s
+    """
+    sql_envios = """
+        SELECT COUNT(*) as envios 
+        FROM envios 
+        WHERE vendedor_id = %(id)s
+    """
+    result_ventas = db.query_one(sql_ventas, {"id": user_id})
+    result_envios = db.query_one(sql_envios, {"id": user_id})
+    
+    ventas = result_ventas["ventas"] if result_ventas else 0
+    envios = result_envios["envios"] if result_envios else 0
+    total = ventas + envios
+    
+    info = {
+        "dependencias": total,
+        "ventas": ventas,
+        "envios": envios,
+        "puede_eliminar": total == 0,
+        "mensaje": f"Este usuario tiene {{ventas}} venta(s) y {{envios}} envío(s) asociados.".format(ventas=ventas, envios=envios)
+    }
+    return info
+
+
 def eliminar_usuario(user_id):
     sql = "DELETE FROM usuarios WHERE id = %(id)s"
     db.execute(sql, {"id": user_id})

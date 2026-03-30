@@ -300,8 +300,25 @@ class UsuariosPanel(ctk.CTkFrame):
             print("[UI] DB not available")
             messagebox.showerror("Error", "404 — Backend / base de datos no disponible.")
             return
+        
+        # Verificar dependencias antes de eliminar
+        try:
+            info = backend_usuarios.get_delete_info(self._editing_id)
+            if info["dependencias"] > 0:
+                respuesta = messagebox.askyesno(
+                    "Confirmar eliminación",
+                    info["mensaje"] + "\n\n¿Desea continuar con la eliminación?",
+                    icon="warning"
+                )
+                if not respuesta:
+                    print("[UI] Usuario canceló eliminación")
+                    return
+        except Exception as check_exc:
+            print(f"[UI] Error en check dependencias: {check_exc}")
+        
         try:
             backend_usuarios.eliminar_usuario(self._editing_id)
+            messagebox.showinfo("Éxito", "Usuario eliminado correctamente.")
             print("[UI] Backend delete success")
             self._editing_id = None
             self._load_from_backend()
@@ -312,7 +329,11 @@ class UsuariosPanel(ctk.CTkFrame):
             print("[UI] Delete UI updated")
         except Exception as exc:
             print(f"[UI ERROR delete] {exc}")
-            messagebox.showerror("Error", f"No se pudo eliminar el usuario.\n{exc}")
+            error_msg = str(exc).lower()
+            if "foreign key constraint fails" in error_msg or "cannot delete" in error_msg:
+                messagebox.showerror("Error", "No se puede eliminar el usuario porque tiene registros asociados (ventas/envíos). Considere cambiar el vendedor en esos registros.")
+            else:
+                messagebox.showerror("Error", f"No se pudo eliminar el usuario.\n{exc}")
 
     # ── Backend helpers ─────────────────────────────────────────────────────────
     def _load_from_backend(self):
@@ -371,4 +392,3 @@ class UsuariosPanel(ctk.CTkFrame):
             )
         print(f"[UI] Applying filters, {len(rows)} rows to table")
         self.table.load_rows(rows)
-

@@ -195,6 +195,17 @@ INSERT INTO ventas_detalle (venta_id, producto_id, talla, cantidad, precio_unit)
 (1,20,'L',1,19.99),
 (2,7,'41',1,129.99);
 
+-- MIGRACIÓN FK USUARIOS: Permitir DELETE con SET NULL (ejecutar UNA VEZ)
+ALTER TABLE ventas MODIFY COLUMN vendedor_id INT NULL;
+ALTER TABLE ventas DROP FOREIGN KEY ventas_ibfk_1;
+ALTER TABLE ventas ADD CONSTRAINT fk_ventas_vendedor 
+  FOREIGN KEY (vendedor_id) REFERENCES usuarios(id) ON DELETE SET NULL;
+
+ALTER TABLE envios MODIFY COLUMN vendedor_id INT NULL;
+ALTER TABLE envios DROP FOREIGN KEY envios_ibfk_1;
+ALTER TABLE envios ADD CONSTRAINT fk_envios_vendedor 
+  FOREIGN KEY (vendedor_id) REFERENCES usuarios(id) ON DELETE SET NULL;
+
 -- MIGRACION para DBs existentes (ejecutar UNA VEZ después del primer cambio)
 -- ALTER TABLE ventas_detalle MODIFY COLUMN producto_id INT NULL;
 -- ALTER TABLE ventas_detalle DROP FOREIGN KEY ventas_detalle_ibfk_2; 
