@@ -77,6 +77,7 @@ class ProductosPanel(ctk.CTkFrame):
         )
         self.table.grid(row=1, column=0, sticky="nsew",
                         padx=(24, 8), pady=(0, 20))
+        self.table.tree.bind("<Button-1>", self._on_single_click)
         self.table.tree.bind("<<TreeviewSelect>>", self._on_select)
 
         # ── Panel lateral de formulario ───────────────────────────────────────
@@ -187,23 +188,46 @@ class ProductosPanel(ctk.CTkFrame):
             self._form_visible = True
 
     def _on_select(self, _event=None):
+        """Fallback for double-click/keyboard selection"""
         print("[UI productos] Selection event")
+        self._populate_form()
+
+    def _on_single_click(self, event):
+        """Stable single-click handler with debounce"""
+        print("[UI productos] Single click event")
+        self.after(150, self._populate_form)
+
+    def _populate_form(self):
+        """Populate form with full data from selected row"""
         data = self.table.get_selected()
         if not data:
             print("[UI productos] No row selected")
             self._selected_id = None
             return
+        
         ref, nombre, talla, color, stock, ubicacion, estado, precio = data
-        # Buscar el ID real en caché
+        
+        # Find full product data in cache using ref
         self._selected_id = None
+        cache_match = False
         for p in self._productos_cache:
             if p["referencia"] == ref:
                 self._selected_id = p["id"]
+                cache_match = True
                 break
-        print(f"[UI productos] Selected ID: {self._selected_id} (ref: {ref})")
+        
+        if not cache_match:
+            print(f"[UI productos] Cache miss for ref {ref}, reloading...")
+            self._load_from_backend()
+            # Retry after reload
+            self.after(200, self._populate_form)
+            return
+        
+        print(f"[UI productos] Populated ID: {self._selected_id} (ref: {ref})")
 
         if not self._form_visible:
             self._toggle_form()
+        
         self.form_title_lbl.configure(text=f"Editar — {ref}")
         self.f_nombre.set(nombre)
         self.f_talla.set(talla)
@@ -212,12 +236,13 @@ class ProductosPanel(ctk.CTkFrame):
         self.f_ubicacion.set(ubicacion)
         self.f_estado.set(estado)
         self.f_precio.set(precio)
-        # Stock mínimo desde caché
-        if self._selected_id is not None:
-            for p in self._productos_cache:
-                if p["id"] == self._selected_id:
-                    self.f_min_stock.set(str(p.get("stock_minimo", "")))
-                    break
+        
+        # Load stock_minimo from cache
+        for p in self._productos_cache:
+            if p["id"] == self._selected_id:
+                self.f_min_stock.set(str(p.get("stock_minimo", "")))
+                break
+        
         self.delete_btn.pack(fill="x", pady=(10, 0))
 
     def _clear_form(self):
