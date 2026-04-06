@@ -228,10 +228,16 @@ class UsuariosPanel(ctk.CTkFrame):
         self._clear_form()
 
     def _clear_form(self):
-    
-            field.clear()
-            self.f_rol.set(ROLES[0])
-            self.f_estado.set("ACTIVO")
+        self.f_nombre.clear()
+        self.f_usuario.clear()
+        self.f_email.clear()
+        self.f_password.clear()
+        self.f_confirm.clear()
+        self.f_rol.set(ROLES[0])
+        self.f_estado.set("ACTIVO")
+        for var in self.perm_vars.values():
+            var.set(True)
+
     def _on_save(self):
         print(f"[UI usuarios] Save clicked, editing_id={self._editing_id}")
         if not db.is_available():
